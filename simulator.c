@@ -302,8 +302,18 @@ void Create_display7seg_txt(){
 
 //creates diskout.txt
 void Create_diskout_txt() {
-    
-};
+    char buffer[512];
+    size_t bytes_read;
+    FILE *diskin, *diskout;
+
+    if ((diskin = open_in_mode(diskin_path, "diskin.txt", "r")) == NULL) {return ;}
+    if ((diskout = open_in_mode(diskout_path, "diskout.txt", "r")) == NULL) {return ;}
+
+    while ((bytes_read = fread(buffer, 1, 512, diskin)) > 0) {fwrite(buffer, 1, 512, diskout);}
+
+    fclose(diskin);
+    fclose(diskout);
+}
 
 //creates monitor.txt, based on monitor[][].
 int Create_monitor_txt(){

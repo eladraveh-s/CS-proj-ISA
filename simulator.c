@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 ///The simulator part of the ISA Project
 
@@ -19,7 +20,7 @@ typedef struct s_instruction {
 typedef struct s_trace_line {
     uint16_t pc;
     Instruction inst;
-    uint32_t reg_pointer_array[16];
+    uint32_t reg_pointer_array_snap[16];
 } Trace_line;
 
 typedef struct s_trace_line_node {
@@ -179,16 +180,93 @@ char *monitor_yuv_path;
 
 //-----------Init functions-------------//
 //reads from imemin.txt the instructions, and inits the "imemin_instructions_array" 
-void Init_instructions_array();
+int Init_instructions_array(){
+    unsigned int i = 0;
+    Instruction inst;
+    char ThreeCharString[4];  // Including the null terminator
+    char TwoCharString[3];  // Including the null terminator
+    char OneCharString[2];  // Including the null terminator
+    unsigned int result;
+    FILE * file_r = fopen(imemin_path, "r");
+    char buffer[13]; //cause every line is 12 chars
+    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", imemin_path); return -1;};
+    while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
+        strncpy(TwoCharString, buffer, 1); //opcode
+        TwoCharString[2] = '\0'; 
+        result = strtoul(TwoCharString, NULL, 16);
+        imemin_instructions_array[i].opcode = (uint8_t)result;
+        strncpy(OneCharString, buffer + 2, 2); //rd
+        OneCharString[1] = '\0'; 
+        result = strtoul(OneCharString, NULL, 16);
+        imemin_instructions_array[i].rd = (uint8_t)result;
+        strncpy(OneCharString, buffer + 3, 3); //rs
+        OneCharString[1] = '\0'; 
+        result = strtoul(OneCharString, NULL, 16);
+        imemin_instructions_array[i].rs = (uint8_t)result;
+        strncpy(OneCharString, buffer + 4, 4); //rt
+        OneCharString[1] = '\0'; 
+        result = strtoul(OneCharString, NULL, 16);
+        imemin_instructions_array[i].rt = (uint8_t)result;
+        strncpy(OneCharString, buffer + 5, 5); //rm
+        OneCharString[1] = '\0'; 
+        result = strtoul(OneCharString, NULL, 16);
+        imemin_instructions_array[i].rm = (uint8_t)result;
+        strncpy(ThreeCharString, buffer + 6, 8); //immediate 1
+        ThreeCharString[4] = '\0'; 
+        result = strtoul(ThreeCharString, NULL, 16);
+        imemin_instructions_array[i].immediate1 = (int16_t)result;
+        strncpy(ThreeCharString, buffer + 9, 11); //immediate 2
+        ThreeCharString[4] = '\0'; 
+        result = strtoul(ThreeCharString, NULL, 16);
+        imemin_instructions_array[i].immediate2 = (int16_t)result;
+        i += 1;
+    }
+    fclose(file_r);
+    return 1;
+};
 
 //reads from dmemin.txt the data memory, and inits the "dmem_array"
-void Init_dmem_array();
+int Init_dmem_array(){
+    unsigned int i = 0;
+    uint32_t line;
+    FILE * file_r = fopen(dmemin_path, "r");
+    char buffer[13]; //cause every line is 12 chars
+    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", dmemin_path); return -1;};
+    while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
+        line = (uint32_t)strtoul(buffer, NULL, 16);
+        dmem_array[i] = line;
+        i+= 1;
+    };
+    fclose(file_r);
+    return 1;
+};
 
 //reads from diskin.txt.
 void Load_diskin();
 
 //reads from irg2in.txt, and inits the "irq2in_list". 
-void Load_irq2in();
+int Load_irq2in(){
+    uint64_t cycle;
+    FILE * file_r = fopen(irq2in_path, "r");
+    Display_trace_line_node * cur_node;
+    Display_trace_line_node * prev_node;
+    char buffer[256]; //change? is it big enough?
+    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", irq2in_path); return -1;};
+    while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
+        cur_node = (Display_trace_line_node*)malloc(sizeof(Display_trace_line_node));
+        if (prev_node != NULL){
+            prev_node->next = cur_node;
+        }
+        else {
+            head_irq2in_list = cur_node;
+        };
+        cycle = (unsigned int)strtoul(buffer, NULL, 10);
+        cur_node->display_trace_line.cycle = cycle;
+        prev_node = cur_node;
+    };
+    fclose(file_r);
+    return 1;
+};
 
 //-----------Output functions----------//
 
@@ -244,7 +322,7 @@ int Create_trace_txt(){
         fprintf(file_a, "%03x ", cur_trace_node->trace_line.pc);
         fprintf(file_a, "%12x", convert_instruction_to_bits(cur_trace_node->trace_line.inst));
         for(int i; i < 16; i++){
-           fprintf(file_a, " %08x", cur_trace_node->trace_line.reg_pointer_array[i]); 
+           fprintf(file_a, " %08x", cur_trace_node->trace_line.reg_pointer_array_snap[i]); 
         };
         fprintf(file_a, "\n");
         cur_trace_node = cur_trace_node->next;
@@ -255,7 +333,25 @@ int Create_trace_txt(){
 };
 
 //creates hwregtrace.txt, based on hw_trace_line_list.
-void Create_hwregtrace_txt();
+int Create_hwregtrace_txt(){
+    FILE *file_a = open_w_then_a(hw_reg_trace_path, "hwregtrace.txt");
+    Hw_trace_line_node * cur_hwreg_node = head_hw_trace_line_list;
+    if (file_a == NULL) {return -1;};
+    while (cur_hwreg_node != NULL){
+        fprintf(file_a, "%d ", cur_hwreg_node->hw_trace_line.cycle);
+        if (cur_hwreg_node->hw_trace_line.read == 0) {
+            fprintf(file_a, "WRITE ");
+        }
+        else {
+            fprintf(file_a, "READ ");
+        };
+        fprintf(file_a, "%s ", IO_reg_names[cur_hwreg_node->hw_trace_line.reg_num]);
+        fprintf(file_a, "%08x\n", cur_hwreg_node->hw_trace_line.data);
+        cur_hwreg_node = cur_hwreg_node->next;
+    };
+    fclose(file_a);
+    return 1;
+};
 
 //creates cycles.txt, based on cycle_counter.
 int Create_cycles_txt(){
@@ -332,7 +428,22 @@ int Create_monitor_txt(){
 
 //take an instruction struct. return uint64_t that represents it.
 uint64_t convert_instruction_to_bits(Instruction inst){
-    uint64_t ret_val;
+    uint64_t ret_val = 0;
+    uint64_t tmp_mask = 0;
+    tmp_mask = (uint64_t)inst.opcode << 40;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rd << 36;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rs << 32;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rt << 28;
+    ret_val = ret_val | tmp_mask;   
+    tmp_mask = (uint64_t)inst.rm << 24;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.immediate1 << 12;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.immediate2;
+    ret_val = ret_val | tmp_mask;
     return ret_val;
 };
 
@@ -383,6 +494,37 @@ Instruction * prep_for_exec() {
 int exec_instruction() {
 
 }
+
+//-----------Commands functions----------//
+
+//gets register's indexes, performs the add command as it describes.
+void do_add_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    int32_t val = *reg_pointer_array[rs_i] + *reg_pointer_array[rt_i] + *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the sub command as it describes.
+void do_sub_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    int32_t val = *reg_pointer_array[rs_i] - *reg_pointer_array[rt_i] - *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the mac command as it describes.
+void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    int32_t val = ((*reg_pointer_array[rs_i])*(*reg_pointer_array[rt_i])) + *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the mac command as it describes.
+void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    int32_t val = ((*reg_pointer_array[rs_i])*(*reg_pointer_array[rt_i])) + *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
 
 int main(int argc, char *argv[]) {
     Instruction *curr_instruction;

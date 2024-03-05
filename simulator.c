@@ -114,6 +114,30 @@ uint16_t monitoraddr;
 uint8_t monitordata;
 uint8_t monitorcmd;
 
+uint32_t* IO_reg_pointer_array[] = {
+    &irq0enable,
+    &irq1enable,
+    &irq2enable,
+    &irq0status,
+    &irq1status,
+    &irq2status,
+    &irqhandler,
+    &irqreturn,
+    &clks,
+    &leds,
+    &display7seg,
+    &timerenable,
+    &timercurrent,
+    &timermax,
+    &diskcmd,
+    &disksector,
+    &diskbuffer,
+    &diskstatus,
+    &monitoraddr,
+    &monitordata,
+    &monitorcmd
+};
+
 //------Monitor------//
 uint8_t monitor[256][256];
 
@@ -460,31 +484,205 @@ void set_up_files(char *paths[]) {
 //gets register's indexes, performs the add command as it describes.
 void do_add_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] + *reg_pointer_array[rt_i] + *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    int32_t val = (int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i] + (int32_t)*reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = (uint32_t)&val;
 };
 
 //gets register's indexes, performs the sub command as it describes.
 void do_sub_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] - *reg_pointer_array[rt_i] - *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    int32_t val = (int32_t)*reg_pointer_array[rs_i] - (int32_t)*reg_pointer_array[rt_i] - (int32_t)*reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = (uint32_t)&val;
 };
 
 //gets register's indexes, performs the mac command as it describes.
 void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = ((*reg_pointer_array[rs_i])*(*reg_pointer_array[rt_i])) + *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    int32_t val = (((int32_t)*reg_pointer_array[rs_i])*((int32_t)*reg_pointer_array[rt_i])) + (int32_t)*reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = (uint32_t)&val;
 };
 
-//gets register's indexes, performs the mac command as it describes.
-void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+
+//gets register's indexes, performs the and command as it describes.
+void do_and_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = ((*reg_pointer_array[rs_i])*(*reg_pointer_array[rt_i])) + *reg_pointer_array[rm_i];
+    uint32_t val = *reg_pointer_array[rs_i] & *reg_pointer_array[rt_i] & *reg_pointer_array[rm_i];
     reg_pointer_array[rd_i] = &val;
 };
 
+//gets register's indexes, performs the or command as it describes.
+void do_or_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t val = *reg_pointer_array[rs_i] | *reg_pointer_array[rt_i] | *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the xor command as it describes.
+void do_xor_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t val = *reg_pointer_array[rs_i] ^ *reg_pointer_array[rt_i] ^ *reg_pointer_array[rm_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+
+//gets register's indexes, performs the sll command as it describes.
+void do_sll_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t val = *reg_pointer_array[rs_i] << *reg_pointer_array[rt_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the sra command as it describes.
+void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t val = (int32_t)*reg_pointer_array[rs_i] >> (int32_t)*reg_pointer_array[rt_i];
+    uint32_t mask = 4294967295; //the largest number, only 1's.
+    mask << 32-(*reg_pointer_array[rt_i]);
+    val = val | mask;
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the srl command as it describes.
+void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
+    reg_pointer_array[rd_i] = &val;
+};
+
+//gets register's indexes, performs the beq command as it describes.
+void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] == *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    };
+    
+};
+
+//gets register's indexes, performs the bne command as it describes.
+void do_bne_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] != *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    };
+    
+};
+
+//gets register's indexes, performs the blt command as it describes.
+void do_blt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] < *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    }; 
+};
+
+//gets register's indexes, performs the bgt command as it describes.
+void do_bgt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] > *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    }; 
+};
+
+//gets register's indexes, performs the ble command as it describes.
+void do_ble_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] <= *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    }; 
+};
+
+//gets register's indexes, performs the bge command as it describes.
+void do_bge_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint16_t mask = 4095; //0000111111111111
+    if (*reg_pointer_array[rs_i] >= *reg_pointer_array[rt_i]){
+        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    }; 
+};
+
+//gets register's indexes, performs the jal command as it describes.
+void do_jal_command(uint8_t rd_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint16_t mask = 4095; //0000111111111111
+    reg_pointer_array[rd_i] = PC + 1; 
+    PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+};
+
+//gets register's indexes, performs the lw command as it describes.
+void do_lw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t mem_index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]); 
+    reg_pointer_array[rd_i] = (uint32_t)((int32_t)dmem_array[mem_index] + (int32_t)*reg_pointer_array[rm_i]);
+};
+
+//gets register's indexes, performs the sw command as it describes.
+void do_sw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint32_t mem_index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]); 
+    uint32_t val = *reg_pointer_array[rm_i] + *reg_pointer_array[rd_i];
+    dmem_array[mem_index] = val;
+};
+
+int IN_ISR; //just for compilation. delete when combining.
+
+//gets register's indexes, performs the reti command as it describes.
+void do_reti_command(){
+    PC = *IO_reg_pointer_array[7];
+    IN_ISR = 0;
+};
+
+//gets register's indexes, performs the in command as it describes.
+int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    if (index > 21) {
+        perror("Error at in command. R[rs]+R[rt] is to big for an IORegister index.");
+        return -1;
+    };
+    reg_pointer_array[rd_i] = *IO_reg_pointer_array[index];
+    return 1;
+};
+
+//gets register's indexes, performs the out command as it describes.
+int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
+    uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    if (index > 21) {
+        perror("Error at out command. R[rs]+R[rt] is to big for an IORegister index.");
+        return -1;
+    };
+    IO_reg_pointer_array[index] = *reg_pointer_array[rm_i];
+    return 1;
+};
+
+//gets the instruction struct. calls the right function to commit it, with the right parameters.
+//returns -1 in error, 1 in success and 0 if the command is halt.
+int commit_the_instruction(Instruction inst){
+    switch (inst.opcode) {
+        case 0:
+            do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+        case 1:
+            do_sub_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+        case 2:
+            do_mac_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+        case 3:
+            do_and_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+        case 4:
+            do_or_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+        case 5:
+            do_xor_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+            break;
+            
+    };
+};
 
 int main(int argc, char *argv[]) {
     set_up_files(argv + 2);

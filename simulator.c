@@ -118,16 +118,16 @@ uint8_t monitor[256][256];
 
 Instruction imemin_instructions_array[4096];
 uint32_t dmem_array[4096];
-Trace_line_node* head_trace_line_list;
-Trace_line_node* curr_trace_line_node;
-Hw_trace_line_node* head_hw_trace_line_list;
-Hw_trace_line_node* curr_hw_trace_line_node;
-Display_trace_line_node* head_leds_trace_list;
-Display_trace_line_node* curr_leds_trace_list;
-Display_trace_line_node* head_dis7seg_trace_list;
-Display_trace_line_node* curr_dis7seg_trace_list;
-Display_trace_line_node* head_irq2in_list;
-Display_trace_line_node* curr_irg2in_list;
+Trace_line_node* head_trace_line_list = NULL;
+Trace_line_node* curr_trace_line_node = NULL;
+Hw_trace_line_node* head_hw_trace_line_list = NULL;
+Hw_trace_line_node* curr_hw_trace_line_node = NULL;
+Display_trace_line_node* head_leds_trace_list = NULL;
+Display_trace_line_node* curr_leds_trace_list = NULL;
+Display_trace_line_node* head_dis7seg_trace_list = NULL;
+Display_trace_line_node* curr_dis7seg_trace_list = NULL;
+Display_trace_line_node* head_irq2in_list = NULL;
+Display_trace_line_node* curr_irg2in_list = NULL;
 
 const char* IO_reg_names[] = {
     "irq0enable",
@@ -352,8 +352,42 @@ void set_up_files(char *paths[]) {
     diskout_path = paths[11];
     monitor_txt_path = paths[12];
     monitor_yuv_path = paths[13];
+
+    Create_diskout_txt();
+}
+
+// Copy regs array
+void copy_regs_array(uint32_t *array) {
+    int i;
+    for (i = 0; i < 16; i++) {array[i] = reg_pointer_array[i];}
+}
+
+void write_trace() {
+    Trace_line_node * new_node = malloc(sizeof(Trace_line_node));
+
+    if (new_node == NULL) {exit(1);}
+    if (curr_trace_line_node == NULL) {curr_trace_line_node->next = new_node;}
+    else {head_trace_line_list = new_node;}
+    curr_trace_line_node = new_node;
+}
+
+// Function prepares for execution
+Instruction * prep_for_exec() {
+    write_trace();
+    copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array);
+    curr_trace_line_node->trace_line.pc = PC;
+    curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC++];
+}
+
+// Reads and executes a command 
+int exec_instruction() {
+
 }
 
 int main(int argc, char *argv[]) {
+    Instruction *curr_instruction;
+
     set_up_files(argv + 2);
+    do {prep_for_exec();} while (exec_instruction());
+    
 }

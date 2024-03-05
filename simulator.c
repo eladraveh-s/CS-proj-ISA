@@ -54,6 +54,7 @@ typedef struct s_display_trace_line_node {
 //-----------Global Varivables----------//
 //////////////////////////////////////////
 uint16_t PC;
+int IN_ISR = 0;
 //------Registers------//
 uint32_t  R_Zero;
 uint32_t  R_imm1;
@@ -447,26 +448,6 @@ uint64_t convert_instruction_to_bits(Instruction inst){
     return ret_val;
 };
 
-//Sets up the file_name parameters
-void set_up_files(char *paths[]) {
-    imemin_path = paths[0];
-    dmemin_path = paths[1];
-    diskin_path = paths[2];
-    irq2in_path = paths[3];
-    dmemout_path = paths[4];
-    regout_path = paths[5];
-    trace_path = paths[6];
-    hw_reg_trace_path = paths[7];
-    cycles_path = paths[8];
-    leds_path = paths[9];
-    display7seg_path = paths[10];
-    diskout_path = paths[11];
-    monitor_txt_path = paths[12];
-    monitor_yuv_path = paths[13];
-
-    Create_diskout_txt();
-}
-
 //-----------Commands functions----------//
 
 //gets register's indexes, performs the add command as it describes.
@@ -499,16 +480,51 @@ void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
 
 // ----------------------- Main and Main Helpers -------------------------------------- //
 
+//Sets up the file_name parameters
+void set_up_files(char *paths[]) {
+    imemin_path = paths[0];
+    dmemin_path = paths[1];
+    diskin_path = paths[2];
+    irq2in_path = paths[3];
+    dmemout_path = paths[4];
+    regout_path = paths[5];
+    trace_path = paths[6];
+    hw_reg_trace_path = paths[7];
+    cycles_path = paths[8];
+    leds_path = paths[9];
+    display7seg_path = paths[10];
+    diskout_path = paths[11];
+    monitor_txt_path = paths[12];
+    monitor_yuv_path = paths[13];
+
+    Create_diskout_txt();
+}
+
 // Copy regs array
 void copy_regs_array(uint32_t *array) {
     int i;
-    for (i = 0; i < 16; i++) {array[i] = reg_pointer_array[i];}
+    for (i = 0; i < 16; i++) {array[i] = *reg_pointer_array[i];}
 }
 
-void write_trace() {
-    Trace_line_node * new_node = malloc(sizeof(Trace_line_node));
+void int_flow() {
+    IN_ISR = 1;
+    irqreturn = PC;
+    PC = irqhandler;
+}
 
+void handle_timer() {
+    if (timerenable == 0) {return ;}
+    if (timercurrent == timermax) {
+        timercurrent = 0;
+        irq0status = 1;
+    }
+    else {timercurrent++;}
+}
+
+void add_trace_node() {
+    Trace_line_node * new_node = malloc(sizeof(Trace_line_node));
     if (new_node == NULL) {exit(1);}
+
     if (curr_trace_line_node == NULL) {curr_trace_line_node->next = new_node;}
     else {head_trace_line_list = new_node;}
     curr_trace_line_node = new_node;
@@ -516,22 +532,29 @@ void write_trace() {
 
 // Function prepares for execution
 Instruction * prep_for_exec() {
-    write_trace();
-    copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array);
+    if((!IN_ISR) && (irq0enable && irq0status) || (irq1enable && irq1status) || (irq2enable && irq2status)) {int_flow();}
+    add_trace_node();
+    copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array_snap);
     curr_trace_line_node->trace_line.pc = PC;
     curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC++];
 }
 
-// Reads and executes a command 
+// Reads and executes a command
 int exec_instruction() {
+    int halt;
 
+    // Actual execution code
+    
+    handle_timer();
+    cycle_counter++;
+    clks++;
+    PC++;
+
+    return halt;
 }
 
 
 int main(int argc, char *argv[]) {
-    Instruction *curr_instruction;
-
     set_up_files(argv + 2);
     do {prep_for_exec();} while (exec_instruction());
-    
 }

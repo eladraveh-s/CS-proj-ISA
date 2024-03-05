@@ -659,28 +659,69 @@ int commit_the_instruction(Instruction inst){
         case 0:
             do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
         case 1:
             do_sub_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
         case 2:
             do_mac_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
         case 3:
             do_and_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
         case 4:
             do_or_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
         case 5:
             do_xor_command(inst.rd, inst.rs, inst.rt, inst.rm);
             return 1;
-            break;
-            
+        case 6:
+            do_sll_command(inst.rd, inst.rs, inst.rt);
+            return 1;
+        case 7:
+            do_sra_command(inst.rd, inst.rs, inst.rt);
+            return 1;
+        case 8:
+            do_srl_command(inst.rd, inst.rs, inst.rt);
+            return 1;
+        case 9:
+            do_beq_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 10:
+            do_bne_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 11:
+            do_blt_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 12:
+            do_bgt_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 13:
+            do_ble_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 14:
+            do_bge_command(inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 15:
+            do_jal_command(inst.rd, inst.rm);
+            return 1;
+        case 16:
+            do_lw_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 17:
+            do_sw_command(inst.rd, inst.rs, inst.rt, inst.rm);
+            return 1;
+        case 18:
+            do_reti_command();
+            return 1;
+        case 19:
+            return do_in_command(inst.rd, inst.rs, inst.rt);
+        case 20:
+            return do_out_command(inst.rd, inst.rs, inst.rt);
+        case 21:
+            return 0;
+        default:
+            perror("Opcode is not recognize (not in 0-21). error in commit_the_instruction\n");
+            return -1;
     };
 };
 

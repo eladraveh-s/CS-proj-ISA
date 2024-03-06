@@ -1,8 +1,9 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-///The simulator part of the ISA Project
+//The simulator part of the ISA Project
 
 //////////////////////////////////////////
 //----------------Structs---------------//
@@ -46,15 +47,24 @@ typedef struct s_display_trace_line {
 } Display_trace_line;
 
 typedef struct s_display_trace_line_node {
-    struct s_display_trace_line * next;                                                                   
+    struct s_display_trace_line_node * next;                                                                   
     Display_trace_line display_trace_line;
 } Display_trace_line_node;
+
+typedef struct s_irq2_node {
+    uint64_t cycle;
+    struct s_irq2_node * next;
+} irq2_node;
 
 //////////////////////////////////////////
 //-----------Global Varivables----------//
 //////////////////////////////////////////
+
+//------General Constants------//
 uint16_t PC;
-int IN_ISR = 0;
+uint64_t DISK_TIMEOUT = 0;
+int CURR_SIG = -1;
+
 //------Registers------//
 uint32_t  R_Zero;
 uint32_t  R_imm1;
@@ -93,29 +103,31 @@ uint32_t* reg_pointer_array[] = {
 };
 
 //------IORegisters------//
-uint8_t irq0enable;
-uint8_t irq1enable;
-uint8_t irq2enable;
-uint8_t irq0status;
-uint8_t irq1status;
-uint8_t irq2status;
-uint16_t irqhandler;
-uint16_t irqreturn;
+uint32_t irq0enable;
+uint32_t irq1enable;
+uint32_t irq2enable;
+uint32_t irq0status;
+uint32_t irq1status;
+uint32_t irq2status;
+uint32_t irqhandler;
+uint32_t irqreturn;
 uint32_t clks;
 uint32_t leds;
 uint32_t display7seg;
-uint8_t timerenable;
+uint32_t timerenable;
 uint32_t timercurrent;
 uint32_t timermax;
-uint8_t diskcmd;
-uint8_t disksector;
-uint16_t diskbuffer;
-uint8_t diskstatus;
-uint16_t monitoraddr;
-uint8_t monitordata;
-uint8_t monitorcmd;
+uint32_t diskcmd;
+uint32_t disksector;
+uint32_t diskbuffer;
+uint32_t diskstatus;
+uint32_t reserved1;
+uint32_t reserved2;
+uint32_t monitoraddr;
+uint32_t monitordata;
+uint32_t monitorcmd;
 
-uint32_t* IO_reg_pointer_array[] = {
+uint32_t * IO_reg_pointer_array[] = {
     &irq0enable,
     &irq1enable,
     &irq2enable,
@@ -134,26 +146,30 @@ uint32_t* IO_reg_pointer_array[] = {
     &disksector,
     &diskbuffer,
     &diskstatus,
+    &reserved1,
+    &reserved2,
     &monitoraddr,
     &monitordata,
     &monitorcmd
 };
 
-//------Monitor------//
+//------IO and Mem Contants------//
 uint8_t monitor[256][256];
-
 Instruction imemin_instructions_array[4096];
 uint32_t dmem_array[4096];
+uint32_t disk_matrix[128][128];
+
+//-------Tracing Lists----------//
 Trace_line_node* head_trace_line_list = NULL;
 Trace_line_node* curr_trace_line_node = NULL;
 Hw_trace_line_node* head_hw_trace_line_list = NULL;
 Hw_trace_line_node* curr_hw_trace_line_node = NULL;
 Display_trace_line_node* head_leds_trace_list = NULL;
-Display_trace_line_node* curr_leds_trace_list = NULL;
+Display_trace_line_node* curr_leds_trace_node = NULL;
 Display_trace_line_node* head_dis7seg_trace_list = NULL;
-Display_trace_line_node* curr_dis7seg_trace_list = NULL;
-Display_trace_line_node* head_irq2in_list = NULL;
-Display_trace_line_node* curr_irg2in_list = NULL;
+Display_trace_line_node* curr_dis7seg_trace_node = NULL;
+irq2_node* head_irq2_list = NULL;
+irq2_node* curr_irq2_node = NULL;
 
 const char* IO_reg_names[] = {
     "irq0enable",
@@ -214,7 +230,7 @@ int Init_instructions_array(){
     unsigned int result;
     FILE * file_r = fopen(imemin_path, "r");
     char buffer[13]; //cause every line is 12 chars
-    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", imemin_path); return -1;};
+    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", imemin_path); return 0;};
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
         strncpy(TwoCharString, buffer, 1); //opcode
         TwoCharString[2] = '\0'; 
@@ -256,9 +272,9 @@ int Init_dmem_array(){
     uint32_t line;
     FILE * file_r = fopen(dmemin_path, "r");
     char buffer[13]; //cause every line is 12 chars
-    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", dmemin_path); return -1;};
+    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", dmemin_path); return 0;};
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        line = (uint32_t)strtoul(buffer, NULL, 16);
+        line = (uint32_t) strtoul(buffer, NULL, 16);
         dmem_array[i] = line;
         i+= 1;
     };
@@ -267,31 +283,66 @@ int Init_dmem_array(){
 };
 
 //reads from diskin.txt.
-void Load_diskin();
-
-//reads from irg2in.txt, and inits the "irq2in_list". 
-int Load_irq2in(){
-    uint64_t cycle;
-    FILE * file_r = fopen(irq2in_path, "r");
-    Display_trace_line_node * cur_node;
-    Display_trace_line_node * prev_node;
-    char buffer[256]; //change? is it big enough?
-    if (file_r == NULL){fprintf(stderr, "could not open path %s in r mode\n", irq2in_path); return -1;};
+int Load_diskin() {
+    int i = 0, j = 0;
+    char buffer[9]; // cause every line is 8 chars
+    uint32_t line;
+    FILE * file_r = fopen(diskin_path, "r");
+    if (file_r == NULL) {
+        fprintf(stderr, "could not open path %s in r mode\n", diskin_path);
+        return 0;
+    }
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        cur_node = (Display_trace_line_node*)malloc(sizeof(Display_trace_line_node));
-        if (prev_node != NULL){
-            prev_node->next = cur_node;
+        line = (uint32_t) strtoul(buffer, NULL, 16);
+        disk_matrix[i][j] = line;
+        j++;
+        if (j == 128) {
+            i++;
+            j = 0;
         }
-        else {
-            head_irq2in_list = cur_node;
-        };
-        cycle = (unsigned int)strtoul(buffer, NULL, 10);
-        cur_node->display_trace_line.cycle = cycle;
-        prev_node = cur_node;
     };
     fclose(file_r);
     return 1;
-};
+}
+
+// Creates a new irq2 node and appends it to the irq2 list
+void add_irq2_node(uint64_t number) {
+    irq2_node * new_node = (irq2_node *) malloc(sizeof(irq2_node));
+    if (new_node == NULL) {exit(1);}
+
+    if (curr_irq2_node != NULL) {curr_irq2_node->next = new_node;}
+    else {head_irq2_list = new_node;}
+    curr_irq2_node = new_node;
+
+    curr_irq2_node->cycle = number;
+}
+
+//reads from irg2in.txt, and inits the "irq2in_list". 
+int Load_irq2in() {
+    int index = 0;
+    char chr, cur_num[200];
+    uint64_t cycle;
+    Display_trace_line_node * cur_node;
+    FILE * file_r = fopen(irq2in_path, "r");
+
+    if (file_r == NULL) {
+        fprintf(stderr, "could not open path %s in r mode\n", irq2in_path);
+        return 0;
+    }
+
+    while ((chr = fgetc(file_r)) != EOF) {
+        if (chr == '\n') {
+            cur_num[index] = '\0';
+            add_irq2_node(strtoul(cur_num, NULL, 10));
+            index = 0;
+        }
+        else{cur_num[index++] = chr;}
+    }
+
+    fclose(file_r);
+    curr_irq2_node = head_irq2_list;
+    return 1;
+}
 
 //-----------Output functions----------//
 
@@ -309,6 +360,27 @@ FILE * open_w_then_a(char *file_path, char *file_name) {
     if ((file_a = open_in_mode(file_path, file_name, "a")) == NULL) {return NULL;}
     return file_a;
 }
+
+//take an instruction struct. return uint64_t that represents it.
+uint64_t convert_instruction_to_bits(Instruction inst){
+    uint64_t ret_val = 0;
+    uint64_t tmp_mask = 0;
+    tmp_mask = (uint64_t)inst.opcode << 40;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rd << 36;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rs << 32;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.rt << 28;
+    ret_val = ret_val | tmp_mask;   
+    tmp_mask = (uint64_t)inst.rm << 24;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.immediate1 << 12;
+    ret_val = ret_val | tmp_mask;
+    tmp_mask = (uint64_t)inst.immediate2;
+    ret_val = ret_val | tmp_mask;
+    return ret_val;
+};
 
 //creates dmemout.txt file, based on dmem_array
 int Create_dmemout_txt(){
@@ -404,9 +476,10 @@ int Create_leds_txt(){
     fclose(file_a);
     return 1;  
 };
+
 //creates display7seg.txt, based on dis7seg_list.
-void Create_display7seg_txt(){
-    FILE* file_a = opan_w_then_a(display7seg_path, "display7seg.txt");
+int Create_display7seg_txt(){
+    FILE* file_a = open_w_then_a(display7seg_path, "display7seg.txt");
     Display_trace_line_node * cur_dis7seg_node = head_dis7seg_trace_list;
 
     if (file_a == NULL) {return -1;}
@@ -422,18 +495,16 @@ void Create_display7seg_txt(){
 };
 
 //creates diskout.txt
-void Create_diskout_txt() {
-    char buffer[512];
-    size_t bytes_read;
-    FILE *diskin, *diskout;
+int Create_diskout_txt() {
+    int i, j;
 
-    if ((diskin = open_in_mode(diskin_path, "diskin.txt", "r")) == NULL) {return ;}
-    if ((diskout = open_in_mode(diskout_path, "diskout.txt", "r")) == NULL) {return ;}
+    FILE* file_a = open_w_then_a(diskout_path, "diskout.txt");
+    if (file_a == NULL) {return -1;}
 
-    while ((bytes_read = fread(buffer, 1, 512, diskin)) > 0) {fwrite(buffer, 1, 512, diskout);}
-
-    fclose(diskin);
-    fclose(diskout);
+    for (i = 0; i < 128; i++) {for (j = 0; j < 128; j++) {fprintf(file_a, "%08x\n", disk_matrix[i][j]);}}
+    
+    fclose(file_a);
+    return 1;
 }
 
 //creates monitor.txt, based on monitor[][].
@@ -451,94 +522,149 @@ int Create_monitor_txt(){
     return 1;
 };
 
-//take an instruction struct. return uint64_t that represents it.
-uint64_t convert_instruction_to_bits(Instruction inst){
-    uint64_t ret_val = 0;
-    uint64_t tmp_mask = 0;
-    tmp_mask = (uint64_t)inst.opcode << 40;
-    ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rd << 36;
-    ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rs << 32;
-    ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rt << 28;
-    ret_val = ret_val | tmp_mask;   
-    tmp_mask = (uint64_t)inst.rm << 24;
-    ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.immediate1 << 12;
-    ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.immediate2;
-    ret_val = ret_val | tmp_mask;
-    return ret_val;
-};
+//------------IO Command Helpers------------//
+
+// Checks if out command wrote something to a cmd IO register and executes accordingly
+void handle_cmds(uint32_t io_reg_ind) {
+    int i;
+
+    if (io_reg_ind == 14) { // Disk
+        if (diskcmd == 1) {for (i = 0; i < 128; i++) {dmem_array[(i + ((int) diskbuffer)) % 4096] = disk_matrix[disksector][i];}}
+        else if (diskcmd == 2) {for (i = 0; i < 128; i++) {disk_matrix[disksector][i] = dmem_array[(i + ((int) diskbuffer)) % 4096];}}
+        else {return ;}
+        DISK_TIMEOUT = (uint64_t) (cycle_counter + 1024);
+        diskstatus = 1;
+    }
+    // Monitor
+    else if (io_reg_ind == 22 && monitorcmd ==1) {monitor[((int) monitoraddr) / 256][((int) monitoraddr) % 256] = monitordata;} 
+}
+
+// Creates a new hw trace node and appends it to the hw trace list
+void add_hw_trace_node(uint32_t reg_num, int in_or_out) {
+    Hw_trace_line_node * new_node = (Hw_trace_line_node *) malloc(sizeof(Hw_trace_line_node));
+    if (new_node == NULL) {exit(1);}
+
+    if (curr_hw_trace_line_node != NULL) {curr_hw_trace_line_node->next = new_node;}
+    else {head_hw_trace_line_list = new_node;}
+    curr_hw_trace_line_node = new_node;
+
+    curr_hw_trace_line_node->next = NULL;
+    curr_hw_trace_line_node->hw_trace_line = (Hw_trace_line) {
+        .cycle = cycle_counter,
+        .read = (uint8_t) in_or_out,
+        .reg_num = (uint8_t) reg_num,
+        .data = *IO_reg_pointer_array[reg_num]
+    };
+}
+
+// Creates a new leds trace node and appends it to the leds trace list
+void add_leds_trace_node() {
+    Display_trace_line_node * new_node = (Display_trace_line_node *) malloc(sizeof(Display_trace_line_node));
+    if (new_node == NULL) {exit(1);}
+
+    if (curr_leds_trace_node != NULL) {curr_leds_trace_node->next = new_node;}
+    else {head_leds_trace_list = new_node;}
+    curr_leds_trace_node = new_node;
+
+    curr_leds_trace_node->next = NULL;
+    curr_leds_trace_node->display_trace_line = (Display_trace_line) {
+        .cycle = cycle_counter,
+        .display_snapshot = leds
+    };
+}
+
+// Creates a new 7 segment display trace node and appends it to the 7 segment display trace list
+void add_dis7seg_trace_node() {
+    Display_trace_line_node * new_node = (Display_trace_line_node *) malloc(sizeof(irq2_node));
+    if (new_node == NULL) {exit(1);}
+
+    if (curr_dis7seg_trace_node != NULL) {curr_dis7seg_trace_node->next = new_node;}
+    else {head_dis7seg_trace_list = new_node;}
+    curr_dis7seg_trace_node = new_node;
+
+    curr_dis7seg_trace_node->next = NULL;
+    curr_dis7seg_trace_node->display_trace_line = (Display_trace_line) {
+        .cycle = cycle_counter,
+        .display_snapshot = display7seg
+    };
+}
+
+// Func handles tracing for hardware commands
+void io_command_trace(uint32_t reg_num, int read) {
+    add_hw_trace_node(reg_num, read);
+
+    if (!read) {
+        if (reg_num == 9) {add_leds_trace_node();}
+        else if (reg_num == 10) {add_dis7seg_trace_node();}
+    }
+}
 
 //-----------Commands functions----------//
 
 //gets register's indexes, performs the add command as it describes.
 void do_add_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = (int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i] + (int32_t)*reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = (uint32_t)&val;
+    int32_t val = (int32_t) *reg_pointer_array[rs_i] + (int32_t) *reg_pointer_array[rt_i] + (int32_t) *reg_pointer_array[rm_i];
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sub command as it describes.
 void do_sub_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
-    int32_t val = (int32_t)*reg_pointer_array[rs_i] - (int32_t)*reg_pointer_array[rt_i] - (int32_t)*reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = (uint32_t)&val;
+    int32_t val = (int32_t) *reg_pointer_array[rs_i] - (int32_t) *reg_pointer_array[rt_i] - (int32_t) *reg_pointer_array[rm_i];
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the mac command as it describes.
 void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     int32_t val = (((int32_t)*reg_pointer_array[rs_i])*((int32_t)*reg_pointer_array[rt_i])) + (int32_t)*reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = (uint32_t)&val;
+    *reg_pointer_array[rd_i] = val;
 };
-
 
 //gets register's indexes, performs the and command as it describes.
 void do_and_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = *reg_pointer_array[rs_i] & *reg_pointer_array[rt_i] & *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the or command as it describes.
 void do_or_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = *reg_pointer_array[rs_i] | *reg_pointer_array[rt_i] | *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the xor command as it describes.
 void do_xor_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = *reg_pointer_array[rs_i] ^ *reg_pointer_array[rt_i] ^ *reg_pointer_array[rm_i];
-    reg_pointer_array[rd_i] = &val;
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sll command as it describes.
 void do_sll_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = *reg_pointer_array[rs_i] << *reg_pointer_array[rt_i];
-    reg_pointer_array[rd_i] = &val;
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sra command as it describes.
-void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
+void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = (int32_t)*reg_pointer_array[rs_i] >> (int32_t)*reg_pointer_array[rt_i];
     uint32_t mask = 4294967295; //the largest number, only 1's.
     mask << 32-(*reg_pointer_array[rt_i]);
     val = val | mask;
-    reg_pointer_array[rd_i] = &val;
-};
+    *reg_pointer_array[rd_i] = val;
+}
 
 //gets register's indexes, performs the srl command as it describes.
 void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
-    reg_pointer_array[rd_i] = &val;
+    *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the beq command as it describes.
@@ -595,7 +721,7 @@ void do_bge_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
 void do_jal_command(uint8_t rd_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint16_t mask = 4095; //0000111111111111
-    reg_pointer_array[rd_i] = PC + 1; 
+    *reg_pointer_array[rd_i] = PC + 1; 
     PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
 };
 
@@ -603,7 +729,7 @@ void do_jal_command(uint8_t rd_i, uint8_t rm_i){
 void do_lw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
     uint32_t mem_index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]); 
-    reg_pointer_array[rd_i] = (uint32_t)((int32_t)dmem_array[mem_index] + (int32_t)*reg_pointer_array[rm_i]);
+    *reg_pointer_array[rd_i] = (uint32_t) ((int32_t) dmem_array[mem_index] + (int32_t) *reg_pointer_array[rm_i]);
 };
 
 //gets register's indexes, performs the sw command as it describes.
@@ -616,29 +742,36 @@ void do_sw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
 //gets register's indexes, performs the reti command as it describes.
 void do_reti_command(){
     PC = *IO_reg_pointer_array[7];
-    IN_ISR = 0;
+
+    if (CURR_SIG == 0) {irq0status = 0;}
+    else if (CURR_SIG == 1) {irq1status = 0;}
+    else if (CURR_SIG == 2) {irq2status = 0;}
+    CURR_SIG = -1;
 };
 
 //gets register's indexes, performs the in command as it describes.
 int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i){
-    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return;}; //read-only registers.
+    if (rd_i == 0 || rd_i == 1 || rd_i == 2) {return 1;}; //read-only registers.
     uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
-    if (index > 21) {
+    if (index > 22) {
         perror("Error at in command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
     };
-    reg_pointer_array[rd_i] = *IO_reg_pointer_array[index];
+    *reg_pointer_array[rd_i] = *IO_reg_pointer_array[index];
+    io_command_trace(index, 1);
     return 1;
 };
 
 //gets register's indexes, performs the out command as it describes.
 int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i){
     uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
-    if (index > 21) {
+    if (index > 22) {
         perror("Error at out command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
     };
-    IO_reg_pointer_array[index] = *reg_pointer_array[rm_i];
+    *IO_reg_pointer_array[index] = *reg_pointer_array[rm_i];
+    handle_cmds(index);
+    io_command_trace(index, 0);
     return 1;
 };
 
@@ -717,7 +850,7 @@ int commit_the_instruction(Instruction inst){
 
 // ----------------------- Main and Main Helpers -------------------------------------- //
 
-//Sets up the file_name parameters
+// Sets up the file_name parameters
 void set_up_files(char *paths[]) {
     imemin_path = paths[0];
     dmemin_path = paths[1];
@@ -733,7 +866,23 @@ void set_up_files(char *paths[]) {
     diskout_path = paths[11];
     monitor_txt_path = paths[12];
     monitor_yuv_path = paths[13];
+}
 
+// Loads needed files into their presperctive constants
+int load_files() {
+    if (Load_diskin() && Load_irq2in() && Init_dmem_array() && Init_instructions_array()) {return 1;}
+    exit(1);
+}
+
+// Creates all needed out files
+void create_out_files() {
+    Create_display7seg_txt();
+    Create_dmemout_txt();
+    Create_cycles_txt();
+    Create_leds_txt();
+    Create_trace_txt();
+    Create_hwregtrace_txt();
+    Create_regout_txt();
     Create_diskout_txt();
 }
 
@@ -743,46 +892,66 @@ void copy_regs_array(uint32_t *array) {
     for (i = 0; i < 16; i++) {array[i] = *reg_pointer_array[i];}
 }
 
-void int_flow() {
-    IN_ISR = 1;
+// Sets up parameters for interupts
+void int_flow(int signal) {
+    CURR_SIG = signal;
     irqreturn = PC;
     PC = irqhandler;
 }
 
-void handle_timer() {
-    if (timerenable == 0) {return ;}
-    if (timercurrent == timermax) {
-        timercurrent = 0;
-        irq0status = 1;
-    }
-    else {timercurrent++;}
-}
-
+// Creates a new trace node and appends it to the trace list
 void add_trace_node() {
     Trace_line_node * new_node = malloc(sizeof(Trace_line_node));
-    if (new_node == NULL) {exit(1);}
+    if (new_node != NULL) {exit(1);}
 
     if (curr_trace_line_node == NULL) {curr_trace_line_node->next = new_node;}
     else {head_trace_line_list = new_node;}
     curr_trace_line_node = new_node;
-}
 
-// Function prepares for execution
-Instruction * prep_for_exec() {
-    if((!IN_ISR) && (irq0enable && irq0status) || (irq1enable && irq1status) || (irq2enable && irq2status)) {int_flow();}
-    add_trace_node();
+    curr_trace_line_node->next = NULL;
     copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array_snap);
     curr_trace_line_node->trace_line.pc = PC;
-    curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC++];
+    curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC];
 }
 
-// Reads and executes a command
+// Handles raising of interrupt status in case any of the interupt cases accured
+void handle_ints() {
+    // Timer
+    if (timerenable == 0) {return ;}
+    if (timercurrent == timermax) {
+        irq0status = 1;
+        timercurrent = 0;
+    }
+    else {timercurrent++;}
+
+    // Disk
+    if (DISK_TIMEOUT != 0 && cycle_counter == DISK_TIMEOUT) {
+        irq1status = 1;
+        diskstatus = 0;
+        DISK_TIMEOUT = 0;
+    }
+
+    // irq2
+    if (curr_irq2_node != NULL && cycle_counter == curr_irq2_node->cycle) {
+        irq2status = 1;
+        curr_irq2_node = curr_irq2_node->next;
+    }
+    else {irq2status = 0;}
+
+    // Raise flags
+    if(CURR_SIG == -1) {
+        if (irq0enable && irq0status) {int_flow(0);}
+        else if (irq1enable && irq1status) {int_flow(1);}
+        else if (irq2enable && irq2status) {int_flow(2);}
+    }
+}
+
+// Reads and executes am instruction
 int exec_instruction() {
     int halt;
 
-    // Actual execution code
+    if ((halt = commit_the_instruction(curr_trace_line_node->trace_line.inst)) == -1) {exit(-1);}
     
-    handle_timer();
     cycle_counter++;
     clks++;
     PC++;
@@ -791,6 +960,16 @@ int exec_instruction() {
 }
 
 int main(int argc, char *argv[]) {
+    // Set Up
     set_up_files(argv + 2);
-    do {prep_for_exec();} while (exec_instruction());
+    load_files();
+
+    // Main
+    do {
+        handle_ints();
+        add_trace_node();
+    } while (exec_instruction());
+
+    // Tear Down
+    create_out_files();
 }

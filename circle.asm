@@ -22,6 +22,7 @@ ColorBlack:
 FinInLoop:
     out $zero, $imm1, $zero, $imm2, 22, 1
     out $zero, $imm1, $zero, $imm2, 22, 0
+    add $s1, $imm1, $zero, $zero, 1, 0
     blt $zero, $s1, $imm1, $imm2, 256, InLoop
     add $s2, $imm1, $zero, $zero, 1, 0
     blt $zero, $s2, $imm1, $imm2, 256, OutLoop

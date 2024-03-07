@@ -6,8 +6,10 @@ OutLoop:
     add $s1, $zero, $zero, $zero, 0, 0 # $s1 = pixel x cor
 
 InLoop:
-    mac $t0, $s1, $s1, $zero, 0, 0 # $t0 = x cor squared
-    mac $t0, $s2, $s2, $t0, 0, 0 # t0 = x cor squared + y cor squared
+    sub $t0, $s1, $imm1, $zero, 128, 0 # $t0 = x distance from the middle (not absolute)
+    sub $t1, $s2, $imm1, $zero, 128, 0 # $t1 = y distance from the middle (not absolute)
+    mac $t0, $t0, $t0, $zero, 0, 0 # $t0 = x dist squared
+    mac $t0, $t1, $t1, $t0, 0, 0 # t0 = x dist squared + y dist squared
     mac $t1, $s1, $imm1, $s2, 256, 0 # pixel number in the array
     out $zero, $imm1, $zero, $t1, 20, 0 # load pixel num to IO register
     ble $zero, $t0, $s0, $ColorWhite # If inside the circle fo to color white

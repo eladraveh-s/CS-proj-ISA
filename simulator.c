@@ -770,6 +770,9 @@ int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 //gets the instruction struct. calls the right function to commit it, with the right parameters.
 //returns -1 in error, 1 in success and 0 if the command is halt.
 int commit_the_instruction(Instruction inst) {
+    R_imm1 = inst.immediate1;
+    R_imm2 = inst.immediate2;
+
     switch (inst.opcode) {
     case 0:
         do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
@@ -895,7 +898,7 @@ void int_flow(int signal) {
 void add_trace_node() {
     Trace_line_node *new_node = (Trace_line_node *) malloc(sizeof(Trace_line_node));
     if (new_node == NULL) { exit(1); }
-
+    
     if (curr_trace_line_node != NULL) { curr_trace_line_node->next = new_node; }
     else { head_trace_line_list = new_node; }
     curr_trace_line_node = new_node;
@@ -942,7 +945,7 @@ void handle_ints() {
 int exec_instruction() {
     int halt;
 
-    if ((halt = commit_the_instruction(curr_trace_line_node->trace_line.inst)) == -1) { exit(-1); }
+    if ((halt = commit_the_instruction(imemin_instructions_array[PC])) == -1) { exit(-1); }
 
     cycle_counter++;
     clks++;

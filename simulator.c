@@ -413,20 +413,20 @@ int Create_regout_txt() {
 //creates trace.txt, based on trace_line_list
 int Create_trace_txt() {
     int i;
+    Trace_line_node *tmp;
     FILE* file_a = open_w_then_a(trace_path, "trace.txt");
-    Trace_line_node* cur_trace_node = head_trace_line_list, *tmp;
-
     if (file_a == NULL) { return -1; }
+    curr_trace_line_node = head_trace_line_list;
 
-    while (cur_trace_node != NULL) {
-        fprintf(file_a, "%03x ", cur_trace_node->trace_line.pc);
-        fprintf(file_a, "%12llx", convert_instruction_to_bits(cur_trace_node->trace_line.inst));
+    while (curr_trace_line_node != NULL) {
+        fprintf(file_a, "%03x ", curr_trace_line_node->trace_line.pc);
+        fprintf(file_a, "%012llx", convert_instruction_to_bits(curr_trace_line_node->trace_line.inst));
         for (i = 0; i < 16; i++) {
-            fprintf(file_a, " %08x", cur_trace_node->trace_line.reg_pointer_array_snap[i]);
+            fprintf(file_a, " %08x", curr_trace_line_node->trace_line.reg_pointer_array_snap[i]);
         };
         fprintf(file_a, "\n");
-        tmp = cur_trace_node;
-        cur_trace_node = cur_trace_node->next;
+        tmp = curr_trace_line_node;
+        curr_trace_line_node = curr_trace_line_node->next;
         free(tmp);
     };
 
@@ -436,22 +436,23 @@ int Create_trace_txt() {
 
 //creates hwregtrace.txt, based on hw_trace_line_list.
 int Create_hwregtrace_txt() {
-    Hw_trace_line_node* cur_hwreg_node = head_hw_trace_line_list, *tmp;
+    Hw_trace_line_node* tmp;
     FILE* file_a = open_w_then_a(hw_reg_trace_path, "hwregtrace.txt");
     if (file_a == NULL) { return -1; };
+    curr_hw_trace_line_node = head_hw_trace_line_list;
 
-    while (cur_hwreg_node != NULL) {
-        fprintf(file_a, "%llu ", cur_hwreg_node->hw_trace_line.cycle);
-        if (cur_hwreg_node->hw_trace_line.read == 0) {
+    while (curr_hw_trace_line_node != NULL) {
+        fprintf(file_a, "%llu ", curr_hw_trace_line_node->hw_trace_line.cycle);
+        if (curr_hw_trace_line_node->hw_trace_line.read == 0) {
             fprintf(file_a, "WRITE ");
         }
         else {
             fprintf(file_a, "READ ");
         };
-        fprintf(file_a, "%s ", IO_reg_names[cur_hwreg_node->hw_trace_line.reg_num]);
-        fprintf(file_a, "%08x\n", cur_hwreg_node->hw_trace_line.data);
-        tmp = cur_hwreg_node;
-        cur_hwreg_node = cur_hwreg_node->next;
+        fprintf(file_a, "%s ", IO_reg_names[curr_hw_trace_line_node->hw_trace_line.reg_num]);
+        fprintf(file_a, "%08x\n", curr_hw_trace_line_node->hw_trace_line.data);
+        tmp = curr_hw_trace_line_node;
+        curr_hw_trace_line_node = curr_hw_trace_line_node->next;
         free(tmp);
     };
     fclose(file_a);
@@ -471,14 +472,13 @@ int Create_cycles_txt() {
 //creates leds.txt, based on leds_trace_list.
 int Create_leds_txt() {
     FILE* file_a = open_w_then_a(leds_path, "leds.txt");
-    Display_trace_line_node* cur_led_node = head_leds_trace_list;
-
     if (file_a == NULL) { return -1; }
+     curr_leds_trace_node = head_leds_trace_list;
 
-    while (cur_led_node != NULL) {
-        fprintf(file_a, "%llu ", cur_led_node->display_trace_line.cycle);
-        fprintf(file_a, "%08x\n", cur_led_node->display_trace_line.display_snapshot);
-        cur_led_node = cur_led_node->next;
+    while (curr_leds_trace_node != NULL) {
+        fprintf(file_a, "%llu ", curr_leds_trace_node->display_trace_line.cycle);
+        fprintf(file_a, "%08x\n", curr_leds_trace_node->display_trace_line.display_snapshot);
+        curr_leds_trace_node = curr_leds_trace_node->next;
     };
 
     fclose(file_a);
@@ -488,14 +488,13 @@ int Create_leds_txt() {
 //creates display7seg.txt, based on dis7seg_list.
 int Create_display7seg_txt() {
     FILE* file_a = open_w_then_a(display7seg_path, "display7seg.txt");
-    Display_trace_line_node* cur_dis7seg_node = head_dis7seg_trace_list;
-
     if (file_a == NULL) { return -1; }
+    curr_dis7seg_trace_node = head_dis7seg_trace_list;
 
-    while (cur_dis7seg_node != NULL) {
-        fprintf(file_a, "%llu ", cur_dis7seg_node->display_trace_line.cycle);
-        fprintf(file_a, "%08x\n", cur_dis7seg_node->display_trace_line.display_snapshot);
-        cur_dis7seg_node = cur_dis7seg_node->next;
+    while (curr_dis7seg_trace_node != NULL) {
+        fprintf(file_a, "%llu ", curr_dis7seg_trace_node->display_trace_line.cycle);
+        fprintf(file_a, "%08x\n", curr_dis7seg_trace_node->display_trace_line.display_snapshot);
+        curr_dis7seg_trace_node = curr_dis7seg_trace_node->next;
     };
 
     fclose(file_a);
@@ -669,7 +668,7 @@ void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //00000111111111111
     if (*reg_pointer_array[rs_i] == *reg_pointer_array[rt_i]) {
-        PC = (uint16_t) *reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t) ((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -677,7 +676,7 @@ void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 void do_bne_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //0000111111111111
     if (*reg_pointer_array[rs_i] != *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -685,7 +684,7 @@ void do_bne_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 void do_blt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //0000111111111111
     if (*reg_pointer_array[rs_i] < *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -693,7 +692,7 @@ void do_blt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 void do_bgt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //0000111111111111
     if (*reg_pointer_array[rs_i] > *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -701,7 +700,7 @@ void do_bgt_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 void do_ble_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //0000111111111111
     if (*reg_pointer_array[rs_i] <= *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -709,7 +708,7 @@ void do_ble_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 void do_bge_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //0000111111111111
     if (*reg_pointer_array[rs_i] >= *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -718,7 +717,7 @@ void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
     uint16_t mask = 0xFFF; //0000111111111111
     *reg_pointer_array[rd_i] = PC + 1;
-    PC = (uint16_t) (*reg_pointer_array[rm_i] & mask); //the casting takes the 16 lower bits.
+    PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
 };
 
 //gets register's indexes, performs the lw command as it describes.
@@ -737,7 +736,7 @@ void do_sw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 
 //gets register's indexes, performs the reti command as it describes.
 void do_reti_command() {
-    PC = *IO_reg_pointer_array[7];
+    PC = *IO_reg_pointer_array[7] - 1;
 
     if (CURR_SIG == 0) { irq0status = 0; }
     else if (CURR_SIG == 1) { irq1status = 0; }
@@ -777,16 +776,6 @@ int commit_the_instruction(Instruction inst) {
     R_imm1 = (int32_t) inst.immediate1;
     R_imm2 = (int32_t) inst.immediate2;
 
-    usleep(100000);
-    fprintf(
-        stdout, "PC: %u, opcode: %u; rd: %d, val: %ld; rs: %d, val: %ld; rt: %d, val: %ld; rn: %d, val: %ld; imm1: %d, imm2: %ld\n",
-        PC, inst.opcode,
-        inst.rd, *reg_pointer_array[inst.rd],
-        inst.rs, *reg_pointer_array[inst.rs],
-        inst.rt, *reg_pointer_array[inst.rt],
-        inst.rm, *reg_pointer_array[inst.rm],
-        inst.immediate1, inst.immediate2
-    );
     switch (inst.opcode) {
     case 0:
         do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
@@ -893,6 +882,7 @@ void create_out_files() {
     Create_hwregtrace_txt();
     Create_regout_txt();
     Create_diskout_txt();
+    Create_monitor_txt();
 }
 
 // Copy regs array
@@ -964,7 +954,7 @@ int exec_instruction() {
 
     cycle_counter++;
     clks++;
-    if (opcode < 9 || (opcode > 15 && opcode != 18)) { PC++; }
+    PC++;
 
     return halt;
 }
@@ -976,11 +966,9 @@ int main(int argc, char* argv[]) {
     
     // Main
     do {
-        fprintf(stdout, "cycle: %llu, ", cycle_counter);
         handle_ints();
         add_trace_node();
     } while (exec_instruction());
-    fprintf(stdout, "Finished Execution");
 
     // Tear Down
     create_out_files();

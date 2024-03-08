@@ -24,7 +24,7 @@ typedef struct s_instruction {
 typedef struct s_trace_line {
     uint16_t pc;
     Instruction inst;
-    uint32_t reg_pointer_array_snap[16];
+    int32_t reg_pointer_array_snap[16];
 } Trace_line;
 
 typedef struct s_trace_line_node {
@@ -69,24 +69,24 @@ uint64_t DISK_TIMEOUT = 0;
 int CURR_SIG = -1;
 
 //------Registers------//
-uint32_t  R_Zero;
-uint32_t  R_imm1;
-uint32_t  R_imm2;
-uint32_t  R_v0;
-uint32_t  R_a0;
-uint32_t  R_a1;
-uint32_t  R_a2;
-uint32_t  R_t0;
-uint32_t  R_t1;
-uint32_t  R_t2;
-uint32_t  R_s0;
-uint32_t  R_s1;
-uint32_t  R_s2;
-uint32_t  R_gp;
-uint32_t  R_sp;
-uint32_t  R_ra;
+int32_t  R_Zero;
+int32_t  R_imm1;
+int32_t  R_imm2;
+int32_t  R_v0;
+int32_t  R_a0;
+int32_t  R_a1;
+int32_t  R_a2;
+int32_t  R_t0;
+int32_t  R_t1;
+int32_t  R_t2;
+int32_t  R_s0;
+int32_t  R_s1;
+int32_t  R_s2;
+int32_t  R_gp;
+int32_t  R_sp;
+int32_t  R_ra;
 
-uint32_t* reg_pointer_array[] = {
+int32_t* reg_pointer_array[] = {
     &R_Zero,
     &R_imm1,
     &R_imm2,
@@ -106,31 +106,31 @@ uint32_t* reg_pointer_array[] = {
 };
 
 //------IORegisters------//
-uint32_t irq0enable;
-uint32_t irq1enable;
-uint32_t irq2enable;
-uint32_t irq0status;
-uint32_t irq1status;
-uint32_t irq2status;
-uint32_t irqhandler;
-uint32_t irqreturn;
-uint32_t clks;
-uint32_t leds;
-uint32_t display7seg;
-uint32_t timerenable;
-uint32_t timercurrent;
-uint32_t timermax;
-uint32_t diskcmd;
-uint32_t disksector;
-uint32_t diskbuffer;
-uint32_t diskstatus;
-uint32_t reserved1;
-uint32_t reserved2;
-uint32_t monitoraddr;
-uint32_t monitordata;
-uint32_t monitorcmd;
+int32_t irq0enable;
+int32_t irq1enable;
+int32_t irq2enable;
+int32_t irq0status;
+int32_t irq1status;
+int32_t irq2status;
+int32_t irqhandler;
+int32_t irqreturn;
+int32_t clks;
+int32_t leds;
+int32_t display7seg;
+int32_t timerenable;
+int32_t timercurrent;
+int32_t timermax;
+int32_t diskcmd;
+int32_t disksector;
+int32_t diskbuffer;
+int32_t diskstatus;
+int32_t reserved1;
+int32_t reserved2;
+int32_t monitoraddr;
+int32_t monitordata;
+int32_t monitorcmd;
 
-uint32_t* IO_reg_pointer_array[] = {
+int32_t* IO_reg_pointer_array[] = {
     &irq0enable,
     &irq1enable,
     &irq2enable,
@@ -544,7 +544,7 @@ void handle_cmds(uint32_t io_reg_ind) {
 }
 
 // Creates a new hw trace node and appends it to the hw trace list
-void add_hw_trace_node(uint32_t reg_num, int in_or_out) {
+void add_hw_trace_node(int reg_num, int in_or_out) {
     Hw_trace_line_node* new_node = (Hw_trace_line_node*)malloc(sizeof(Hw_trace_line_node));
     if (new_node == NULL) { exit(1); }
 
@@ -588,7 +588,7 @@ void add_dis7seg_trace_node() {
 }
 
 // Func handles tracing for hardware commands
-void io_command_trace(uint32_t reg_num, int read) {
+void io_command_trace(int reg_num, int read) {
     add_hw_trace_node(reg_num, read);
 
     if (!read) {
@@ -602,57 +602,57 @@ void io_command_trace(uint32_t reg_num, int read) {
 //gets register's indexes, performs the add command as it describes.
 void do_add_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = (int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i] + (int32_t)*reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] + *reg_pointer_array[rt_i] + *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sub command as it describes.
 void do_sub_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = (int32_t)*reg_pointer_array[rs_i] - (int32_t)*reg_pointer_array[rt_i] - (int32_t)*reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] - *reg_pointer_array[rt_i] - *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the mac command as it describes.
 void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = (((int32_t)*reg_pointer_array[rs_i]) * ((int32_t)*reg_pointer_array[rt_i])) + (int32_t)*reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] * *reg_pointer_array[rt_i] + *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the and command as it describes.
 void do_and_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = *reg_pointer_array[rs_i] & *reg_pointer_array[rt_i] & *reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] & *reg_pointer_array[rt_i] & *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the or command as it describes.
 void do_or_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = *reg_pointer_array[rs_i] | *reg_pointer_array[rt_i] | *reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] | *reg_pointer_array[rt_i] | *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the xor command as it describes.
 void do_xor_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = *reg_pointer_array[rs_i] ^ *reg_pointer_array[rt_i] ^ *reg_pointer_array[rm_i];
+    int32_t val = *reg_pointer_array[rs_i] ^ *reg_pointer_array[rt_i] ^ *reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sll command as it describes.
 void do_sll_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = *reg_pointer_array[rs_i] << *reg_pointer_array[rt_i];
+    int32_t val = *reg_pointer_array[rs_i] << *reg_pointer_array[rt_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the sra command as it describes.
 void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = (int32_t)*reg_pointer_array[rs_i] >> (int32_t)*reg_pointer_array[rt_i];
-    uint32_t mask = 0xFFFFFFFF; //All 1's
+    int32_t val = *reg_pointer_array[rs_i] >> *reg_pointer_array[rt_i];
+    int32_t mask = 0xFFFFFFFF; //All 1's
     mask = mask << (32 - (*reg_pointer_array[rt_i]));
     val = val | mask;
     *reg_pointer_array[rd_i] = val;
@@ -661,7 +661,7 @@ void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 //gets register's indexes, performs the srl command as it describes.
 void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
+    int32_t val = *reg_pointer_array[rs_i] >> *reg_pointer_array[rt_i];
     *reg_pointer_array[rd_i] = val;
 };
 
@@ -669,7 +669,7 @@ void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //00000111111111111
     if (*reg_pointer_array[rs_i] == *reg_pointer_array[rt_i]) {
-        PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+        PC = (uint16_t) *reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
     };
 };
 
@@ -724,13 +724,13 @@ void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
 //gets register's indexes, performs the lw command as it describes.
 void do_lw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t mem_index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
-    *reg_pointer_array[rd_i] = (uint32_t)((int32_t)dmem_array[mem_index] + (int32_t)*reg_pointer_array[rm_i]);
+    uint32_t mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
+    *reg_pointer_array[rd_i] = dmem_array[mem_index] + *reg_pointer_array[rm_i];
 };
 
 //gets register's indexes, performs the sw command as it describes.
 void do_sw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
-    uint32_t mem_index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    uint32_t mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
     uint32_t val = *reg_pointer_array[rm_i] + *reg_pointer_array[rd_i];
     dmem_array[mem_index] = val;
 };
@@ -748,7 +748,7 @@ void do_reti_command() {
 //gets register's indexes, performs the in command as it describes.
 int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return 1; }; //read-only registers.
-    uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    int index = (int)(*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]);
     if (index > 22) {
         perror("Error at in command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
@@ -760,7 +760,7 @@ int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 
 //gets register's indexes, performs the out command as it describes.
 int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
-    uint32_t index = (uint32_t)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    int index = (int)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
     if (index > 22) {
         perror("Error at out command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
@@ -774,12 +774,13 @@ int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 //gets the instruction struct. calls the right function to commit it, with the right parameters.
 //returns -1 in error, 1 in success and 0 if the command is halt.
 int commit_the_instruction(Instruction inst) {
-    R_imm1 = inst.immediate1;
-    R_imm2 = inst.immediate2;
+    R_imm1 = (int32_t) inst.immediate1;
+    R_imm2 = (int32_t) inst.immediate2;
 
+    usleep(100000);
     fprintf(
-        stdout, "opcode: %u; rd: %u, val: %u; rs: %u, val: %u; rt: %u, val: %u; rn: %u, val: %u; imm1: %u, imm2: %u\n",
-        inst.opcode,
+        stdout, "PC: %u, opcode: %u; rd: %d, val: %ld; rs: %d, val: %ld; rt: %d, val: %ld; rn: %d, val: %ld; imm1: %d, imm2: %ld\n",
+        PC, inst.opcode,
         inst.rd, *reg_pointer_array[inst.rd],
         inst.rs, *reg_pointer_array[inst.rs],
         inst.rt, *reg_pointer_array[inst.rt],
@@ -895,7 +896,7 @@ void create_out_files() {
 }
 
 // Copy regs array
-void copy_regs_array(uint32_t* array) {
+void copy_regs_array(int32_t* array) {
     int i;
     for (i = 0; i < 16; i++) { array[i] = *reg_pointer_array[i]; }
 }
@@ -907,7 +908,7 @@ void int_flow(int signal) {
     PC = irqhandler;
 }
 
-// Creates a new trace node and appends it to the trace list
+// Creates a new trace node and appends it to the trace lists
 void add_trace_node() {
     Trace_line_node *new_node = (Trace_line_node *) malloc(sizeof(Trace_line_node));
     if (new_node == NULL) { exit(1); }
@@ -975,10 +976,11 @@ int main(int argc, char* argv[]) {
     
     // Main
     do {
-        fprintf(stdout, "cycle: %llu ", cycle_counter);
+        fprintf(stdout, "cycle: %llu, ", cycle_counter);
         handle_ints();
         add_trace_node();
     } while (exec_instruction());
+    fprintf(stdout, "Finished Execution");
 
     // Tear Down
     create_out_files();

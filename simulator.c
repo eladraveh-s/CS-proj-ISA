@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 //The simulator part of the ISA Project
 
@@ -230,34 +231,34 @@ int Init_instructions_array() {
     char OneCharString[2];  // Including the null terminator
     unsigned int result;
     FILE* file_r = fopen(imemin_path, "r");
-    char buffer[13]; //cause every line is 12 chars
+    char buffer[14]; //cause every line is 13 chars (including \n)
     if (file_r == NULL) { fprintf(stderr, "could not open path %s in r mode\n", imemin_path); return 0; };
-    while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        strncpy(TwoCharString, buffer, 1); //opcode
+    while (fgets(buffer, sizeof(buffer), file_r) != NULL && i < 4096) {
+        strncpy(TwoCharString, buffer, 2); //opcode
         TwoCharString[2] = '\0';
         result = strtoul(TwoCharString, NULL, 16);
         imemin_instructions_array[i].opcode = (uint8_t)result;
-        strncpy(OneCharString, buffer + 2, 2); //rd
+        strncpy(OneCharString, buffer + 2, 1); //rd
         OneCharString[1] = '\0';
         result = strtoul(OneCharString, NULL, 16);
         imemin_instructions_array[i].rd = (uint8_t)result;
-        strncpy(OneCharString, buffer + 3, 3); //rs
+        strncpy(OneCharString, buffer + 3, 1); //rs
         OneCharString[1] = '\0';
         result = strtoul(OneCharString, NULL, 16);
         imemin_instructions_array[i].rs = (uint8_t)result;
-        strncpy(OneCharString, buffer + 4, 4); //rt
+        strncpy(OneCharString, buffer + 4, 1); //rt
         OneCharString[1] = '\0';
         result = strtoul(OneCharString, NULL, 16);
         imemin_instructions_array[i].rt = (uint8_t)result;
-        strncpy(OneCharString, buffer + 5, 5); //rm
+        strncpy(OneCharString, buffer + 5, 1); //rm
         OneCharString[1] = '\0';
         result = strtoul(OneCharString, NULL, 16);
         imemin_instructions_array[i].rm = (uint8_t)result;
-        strncpy(ThreeCharString, buffer + 6, 8); //immediate 1
+        strncpy(ThreeCharString, buffer + 6, 3); //immediate 1
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
         imemin_instructions_array[i].immediate1 = (int16_t)result;
-        strncpy(ThreeCharString, buffer + 9, 11); //immediate 2
+        strncpy(ThreeCharString, buffer + 9, 3); //immediate 2
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
         imemin_instructions_array[i].immediate2 = (int16_t)result;
@@ -413,7 +414,7 @@ int Create_regout_txt() {
 int Create_trace_txt() {
     int i;
     FILE* file_a = open_w_then_a(trace_path, "trace.txt");
-    Trace_line_node* cur_trace_node = head_trace_line_list;
+    Trace_line_node* cur_trace_node = head_trace_line_list, *tmp;
 
     if (file_a == NULL) { return -1; }
 
@@ -424,7 +425,9 @@ int Create_trace_txt() {
             fprintf(file_a, " %08x", cur_trace_node->trace_line.reg_pointer_array_snap[i]);
         };
         fprintf(file_a, "\n");
+        tmp = cur_trace_node;
         cur_trace_node = cur_trace_node->next;
+        free(tmp);
     };
 
     fclose(file_a);
@@ -433,9 +436,10 @@ int Create_trace_txt() {
 
 //creates hwregtrace.txt, based on hw_trace_line_list.
 int Create_hwregtrace_txt() {
+    Hw_trace_line_node* cur_hwreg_node = head_hw_trace_line_list, *tmp;
     FILE* file_a = open_w_then_a(hw_reg_trace_path, "hwregtrace.txt");
-    Hw_trace_line_node* cur_hwreg_node = head_hw_trace_line_list;
     if (file_a == NULL) { return -1; };
+
     while (cur_hwreg_node != NULL) {
         fprintf(file_a, "%llu ", cur_hwreg_node->hw_trace_line.cycle);
         if (cur_hwreg_node->hw_trace_line.read == 0) {
@@ -446,7 +450,9 @@ int Create_hwregtrace_txt() {
         };
         fprintf(file_a, "%s ", IO_reg_names[cur_hwreg_node->hw_trace_line.reg_num]);
         fprintf(file_a, "%08x\n", cur_hwreg_node->hw_trace_line.data);
+        tmp = cur_hwreg_node;
         cur_hwreg_node = cur_hwreg_node->next;
+        free(tmp);
     };
     fclose(file_a);
     return 1;
@@ -665,7 +671,6 @@ void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (*reg_pointer_array[rs_i] == *reg_pointer_array[rt_i]) {
         PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
     };
-
 };
 
 //gets register's indexes, performs the bne command as it describes.
@@ -674,7 +679,6 @@ void do_bne_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (*reg_pointer_array[rs_i] != *reg_pointer_array[rt_i]) {
         PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
     };
-
 };
 
 //gets register's indexes, performs the blt command as it describes.
@@ -714,7 +718,7 @@ void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
     uint16_t mask = 0xFFF; //0000111111111111
     *reg_pointer_array[rd_i] = PC + 1;
-    PC = (uint16_t)*reg_pointer_array[rm_i] & mask; //the casting takes the 16 lower bits.
+    PC = (uint16_t) (*reg_pointer_array[rm_i] & mask); //the casting takes the 16 lower bits.
 };
 
 //gets register's indexes, performs the lw command as it describes.
@@ -773,6 +777,15 @@ int commit_the_instruction(Instruction inst) {
     R_imm1 = inst.immediate1;
     R_imm2 = inst.immediate2;
 
+    fprintf(
+        stdout, "opcode: %u; rd: %u, val: %u; rs: %u, val: %u; rt: %u, val: %u; rn: %u, val: %u; imm1: %u, imm2: %u\n",
+        inst.opcode,
+        inst.rd, *reg_pointer_array[inst.rd],
+        inst.rs, *reg_pointer_array[inst.rs],
+        inst.rt, *reg_pointer_array[inst.rt],
+        inst.rm, *reg_pointer_array[inst.rm],
+        inst.immediate1, inst.immediate2
+    );
     switch (inst.opcode) {
     case 0:
         do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
@@ -944,23 +957,25 @@ void handle_ints() {
 // Reads and executes am instruction
 int exec_instruction() {
     int halt;
+    uint8_t opcode = curr_trace_line_node->trace_line.inst.opcode;
 
     if ((halt = commit_the_instruction(imemin_instructions_array[PC])) == -1) { exit(-1); }
 
     cycle_counter++;
     clks++;
-    PC++;
+    if (opcode < 9 || (opcode > 15 && opcode != 18)) { PC++; }
 
     return halt;
 }
 
 int main(int argc, char* argv[]) {
     // Set Up
-    set_up_files(argv + 2);
+    set_up_files(argv + 1);
     load_files();
-
+    
     // Main
     do {
+        fprintf(stdout, "cycle: %llu ", cycle_counter);
         handle_ints();
         add_trace_node();
     } while (exec_instruction());

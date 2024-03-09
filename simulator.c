@@ -223,6 +223,7 @@ char* monitor_yuv_path;
 
 //-----------Init functions-------------//
 //reads from imemin.txt the instructions, and inits the "imemin_instructions_array" 
+int neg_mask = 61440;
 int Init_instructions_array() {
     unsigned int i = 0;
     char ThreeCharString[4];  // Including the null terminator
@@ -256,10 +257,16 @@ int Init_instructions_array() {
         strncpy(ThreeCharString, buffer + 6, 3); //immediate 1
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
+        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f'){
+            result = result | neg_mask; //trouble with casting, cause 12 bit var gets into 16 bits var, deafult 0 extantion.
+        };
         imemin_instructions_array[i].immediate1 = (int16_t)result;
         strncpy(ThreeCharString, buffer + 9, 3); //immediate 2
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
+        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f'){
+            result = result | neg_mask; //trouble with casting, cause 12 bit var gets into 16 bits var, deafult 0 extantion.
+        };
         imemin_instructions_array[i].immediate2 = (int16_t)result;
         i += 1;
     }
@@ -365,19 +372,35 @@ FILE* open_w_then_a(char * file_path, const char * file_name) {
 uint64_t convert_instruction_to_bits(Instruction inst) {
     uint64_t ret_val = 0;
     uint64_t tmp_mask = 0;
-    tmp_mask = (uint64_t)inst.opcode << 40;
+    uint64_t mask_4bit = 15;
+    uint64_t mask_8bit = 255;
+    uint64_t mask_12bit = 4095;
+    tmp_mask = mask_8bit & (uint64_t)inst.opcode;
+    tmp_mask = tmp_mask << 40;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rd << 36;
+
+    tmp_mask = mask_4bit & (uint64_t)inst.rd;
+    tmp_mask = tmp_mask << 36;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rs << 32;
+
+    tmp_mask = mask_4bit & (uint64_t)inst.rs;
+    tmp_mask = tmp_mask << 32;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rt << 28;
+
+    tmp_mask = mask_4bit & (uint64_t)inst.rt;
+    tmp_mask = tmp_mask << 28;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.rm << 24;
+
+    tmp_mask = mask_4bit & (uint64_t)inst.rm;
+    tmp_mask = tmp_mask << 24;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.immediate1 << 12;
+
+    tmp_mask = mask_12bit & (uint64_t)inst.immediate1;
+    tmp_mask = tmp_mask << 12;
     ret_val = ret_val | tmp_mask;
-    tmp_mask = (uint64_t)inst.immediate2;
+
+    tmp_mask = mask_12bit & (uint64_t)inst.immediate2;
+    tmp_mask = tmp_mask;
     ret_val = ret_val | tmp_mask;
     return ret_val;
 };
@@ -403,6 +426,9 @@ int Create_regout_txt() {
     if (file_a == NULL) { return -1; }
 
     for (i = 3; i < 16; i++) { fprintf(file_a, "%08x\n", *(reg_pointer_array[i])); }
+    for (i = 3; i < 16; i++) {
+        fprintf(file_a, "%08x\n", *(reg_pointer_array[i]));
+    };
 
     fclose(file_a);
     return 1;
@@ -751,9 +777,16 @@ int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     return 1;
 };
 
+//int cnt2 = 0;
 //gets register's indexes, performs the out command as it describes.
 int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
-    int index = (int)(*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]);
+    int index = (int)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    //if (cnt2 < 5){
+    //    printf("in register rs is: %d\n", *reg_pointer_array[rs_i]);
+    //    printf("in register rt is: %d\n", *reg_pointer_array[rt_i]);
+    //    printf("out command index is: %d\n", index);
+    //};
+    //cnt2 += 1;
     if (index > 22) {
         perror("Error at out command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
@@ -764,11 +797,23 @@ int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     return 1;
 };
 
+int cnt = 0;
 //gets the instruction struct. calls the right function to commit it, with the right parameters.
 //returns -1 in error, 1 in success and 0 if the command is halt.
 int commit_the_instruction(Instruction inst) {
-    R_imm1 = (int32_t) inst.immediate1;
-    R_imm2 = (int32_t) inst.immediate2;
+    if (cnt == 5) {
+        printf("opcode: %u\n", inst.opcode);
+        printf("imm1: %d\n", R_imm1);
+        printf("imm1: %d\n", *reg_pointer_array[1]);
+        printf("imm2: %d\n", R_imm2);
+        printf("imm2: %d\n", *reg_pointer_array[2]);
+        
+        printf("rd: %u\n", inst.rd);
+        printf("rs: %u\n", inst.rs);
+        printf("rt: %u\n", inst.rt);
+        printf("rm: %u\n", inst.rm);
+    }; 
+    cnt += 1;
 
     switch (inst.opcode) {
     case 0:
@@ -896,7 +941,7 @@ void add_trace_node() {
 
     curr_trace_line_node->next = NULL;
     copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array_snap);
-    curr_trace_line_node->trace_line.pc = PC;
+    curr_trace_line_node->trace_line.pc = PC; 
     curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC];
 }
 
@@ -947,7 +992,8 @@ void handle_ints() {
 // Reads and executes am instruction
 int exec_instruction() {
     int halt;
-    uint8_t opcode = curr_trace_line_node->trace_line.inst.opcode;
+    //uint8_t opcode = curr_trace_line_node->trace_line.inst.opcode;
+    uint8_t opcode = imemin_instructions_array[PC].opcode;
 
     if ((halt = commit_the_instruction(imemin_instructions_array[PC])) == -1) { exit(-1); }
 
@@ -958,6 +1004,11 @@ int exec_instruction() {
     return halt;
 }
 
+void update_immediates(){
+    R_imm1 = (int32_t) imemin_instructions_array[PC].immediate1;
+    R_imm2 = (int32_t) imemin_instructions_array[PC].immediate2;
+};
+
 int main(int argc, char* argv[]) {
     // Set Up
     set_up_files(argv + 1);
@@ -966,6 +1017,7 @@ int main(int argc, char* argv[]) {
     // Main
     do {
         handle_ints();
+        update_immediates();
         add_trace_node();
     } while (exec_instruction());
 

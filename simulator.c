@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 //The simulator part of the ISA Project
 
@@ -341,6 +340,7 @@ int Load_irq2in() {
 
     fclose(file_r);
     curr_irq2_node = head_irq2_list;
+
     return 1;
 }
 
@@ -402,9 +402,7 @@ int Create_regout_txt() {
     FILE* file_a = open_w_then_a(regout_path, "regout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < 16; i++) {
-        fprintf(file_a, "%08x\n", *(reg_pointer_array[i]));
-    };
+    for (i = 3; i < 16; i++) { fprintf(file_a, "%08x\n", *(reg_pointer_array[i])); }
 
     fclose(file_a);
     return 1;
@@ -443,12 +441,8 @@ int Create_hwregtrace_txt() {
 
     while (curr_hw_trace_line_node != NULL) {
         fprintf(file_a, "%llu ", curr_hw_trace_line_node->hw_trace_line.cycle);
-        if (curr_hw_trace_line_node->hw_trace_line.read == 0) {
-            fprintf(file_a, "WRITE ");
-        }
-        else {
-            fprintf(file_a, "READ ");
-        };
+        if (curr_hw_trace_line_node->hw_trace_line.read == 0) { fprintf(file_a, "WRITE "); }
+        else { fprintf(file_a, "READ "); }
         fprintf(file_a, "%s ", IO_reg_names[curr_hw_trace_line_node->hw_trace_line.reg_num]);
         fprintf(file_a, "%08x\n", curr_hw_trace_line_node->hw_trace_line.data);
         tmp = curr_hw_trace_line_node;
@@ -473,7 +467,7 @@ int Create_cycles_txt() {
 int Create_leds_txt() {
     FILE* file_a = open_w_then_a(leds_path, "leds.txt");
     if (file_a == NULL) { return -1; }
-     curr_leds_trace_node = head_leds_trace_list;
+    curr_leds_trace_node = head_leds_trace_list;
 
     while (curr_leds_trace_node != NULL) {
         fprintf(file_a, "%llu ", curr_leds_trace_node->display_trace_line.cycle);
@@ -543,7 +537,7 @@ void handle_cmds(uint32_t io_reg_ind) {
 }
 
 // Creates a new hw trace node and appends it to the hw trace list
-void add_hw_trace_node(int reg_num, int in_or_out) {
+void add_hw_trace_node(int reg_num, int read) {
     Hw_trace_line_node* new_node = (Hw_trace_line_node*)malloc(sizeof(Hw_trace_line_node));
     if (new_node == NULL) { exit(1); }
 
@@ -553,7 +547,7 @@ void add_hw_trace_node(int reg_num, int in_or_out) {
 
     curr_hw_trace_line_node->next = NULL;
     curr_hw_trace_line_node->hw_trace_line.cycle = cycle_counter;
-    curr_hw_trace_line_node->hw_trace_line.read = (uint8_t) in_or_out;
+    curr_hw_trace_line_node->hw_trace_line.read = (uint8_t) read;
     curr_hw_trace_line_node->hw_trace_line.reg_num = (uint8_t) reg_num;
     curr_hw_trace_line_node->hw_trace_line.data = *IO_reg_pointer_array[reg_num];
 }
@@ -759,7 +753,7 @@ int do_in_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 
 //gets register's indexes, performs the out command as it describes.
 int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
-    int index = (int)((int32_t)*reg_pointer_array[rs_i] + (int32_t)*reg_pointer_array[rt_i]);
+    int index = (int)(*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]);
     if (index > 22) {
         perror("Error at out command. R[rs]+R[rt] is to big for an IORegister index.");
         return -1;
@@ -837,7 +831,7 @@ int commit_the_instruction(Instruction inst) {
     case 19:
         return do_in_command(inst.rd, inst.rs, inst.rt);
     case 20:
-        return do_out_command(inst.rd, inst.rs, inst.rt);
+        return do_out_command(inst.rs, inst.rt, inst.rm);
     case 21:
         return 0;
     default:
@@ -891,13 +885,6 @@ void copy_regs_array(int32_t* array) {
     for (i = 0; i < 16; i++) { array[i] = *reg_pointer_array[i]; }
 }
 
-// Sets up parameters for interupts
-void int_flow(int signal) {
-    CURR_SIG = signal;
-    irqreturn = PC;
-    PC = irqhandler;
-}
-
 // Creates a new trace node and appends it to the trace lists
 void add_trace_node() {
     Trace_line_node *new_node = (Trace_line_node *) malloc(sizeof(Trace_line_node));
@@ -915,6 +902,8 @@ void add_trace_node() {
 
 // Handles raising of interrupt status in case any of the interupt cases accured
 void handle_ints() {
+    int cnd0, cnd1, cnd2;
+
     // Timer
     if (timerenable == 0) { return; }
     if (timercurrent == timermax) {
@@ -931,17 +920,27 @@ void handle_ints() {
     }
 
     // irq2
-    if (curr_irq2_node != NULL && cycle_counter == curr_irq2_node->cycle) {
-        irq2status = 1;
-        curr_irq2_node = curr_irq2_node->next;
+    if (curr_irq2_node != NULL) {
+        fprintf(stdout, "raised status cnd2");
+        if (cycle_counter == curr_irq2_node->cycle) {
+            irq2status = 1;
+            curr_irq2_node = curr_irq2_node->next;
+        }
     }
     else { irq2status = 0; }
 
+    cnd0 = irq0enable && irq0status;
+    cnd1 = irq1enable && irq1status;
+    cnd2 = irq2enable && irq2status;
+
     // Raise flags
-    if (CURR_SIG == -1) {
-        if (irq0enable && irq0status) { int_flow(0); }
-        else if (irq1enable && irq1status) { int_flow(1); }
-        else if (irq2enable && irq2status) { int_flow(2); }
+    if (CURR_SIG == -1 && (cnd0 || cnd1 || cnd2)) {
+        fprintf(stdout, "starting interupt: cnd0 = %d, cnd1 = %d, cnd2 = %d", cnd0, cnd1, cnd2);
+        if (cnd0) { CURR_SIG = 0; }
+        else if (cnd1) { CURR_SIG = 1; }
+        else if (cnd2) { CURR_SIG = 2; }
+        irqreturn = PC;
+        PC = irqhandler;
     }
 }
 

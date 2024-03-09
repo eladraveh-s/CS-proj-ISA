@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 //The simulator part of the ISA Project
 
@@ -405,14 +406,57 @@ uint64_t convert_instruction_to_bits(Instruction inst) {
     return ret_val;
 };
 
+//finds the index that its only zeros after
+int find_limit_index_in_dmem(){
+    int i;
+    int index = 0;
+    for (i = 0; i < 4096; i++) {
+        if (dmem_array[i] != 0) {
+            index = i+1;
+        };
+    };
+    return index;
+};
+
+//finds the index that its only zeros after
+int find_limit_index_in_diskout(){
+    int i;
+    int j;
+    int index = 0;
+    for (i = 0; i < 128; i++) { 
+        for (j = 0; j < 128; j++) { 
+            if (disk_matrix[i][j] != 0){
+                index = i*128 + j + 1;
+            };
+        };
+    };
+    return index;
+};
+
+//finds the index that its only zeros after
+int find_limit_index_in_monitor(){
+    int i;
+    int j;
+    int index = 0;
+    for (i = 0; i < 256; i++) { 
+        for (j = 0; j < 256; j++) { 
+            if (monitor[i][j] != 0){
+                index = i*256 + j + 1;
+            };
+        };
+    };
+    return index;
+};
+
 //creates dmemout.txt file, based on dmem_array
 int Create_dmemout_txt() {
     int i;
+    int index = find_limit_index_in_dmem();
     FILE* file_a = open_w_then_a(dmemout_path, "dmemout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < 4096; i++) {
-        fprintf(file_a, "%08x\n", dmem_array[i]);
+    for (i = 0; i < index; i++) {
+        fprintf(file_a, "%08" PRIX32 "\n", dmem_array[i]);
     };
 
     fclose(file_a);
@@ -425,7 +469,7 @@ int Create_regout_txt() {
     FILE* file_a = open_w_then_a(regout_path, "regout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 3; i < 16; i++) { fprintf(file_a, "%08x\n", *(reg_pointer_array[i])); }
+    for (i = 3; i < 16; i++) { fprintf(file_a, "%08"PRIX32"\n", *(reg_pointer_array[i])); }
 
     fclose(file_a);
     return 1;
@@ -440,8 +484,8 @@ int Create_trace_txt() {
     curr_trace_line_node = head_trace_line_list;
 
     while (curr_trace_line_node != NULL) {
-        fprintf(file_a, "%03x ", curr_trace_line_node->trace_line.pc);
-        fprintf(file_a, "%012llx", convert_instruction_to_bits(curr_trace_line_node->trace_line.inst));
+        fprintf(file_a, "%03"PRIX16" ", curr_trace_line_node->trace_line.pc);
+        fprintf(file_a, "%012"PRIX64, convert_instruction_to_bits(curr_trace_line_node->trace_line.inst));
         for (i = 0; i < 16; i++) {
             fprintf(file_a, " %08x", curr_trace_line_node->trace_line.reg_pointer_array_snap[i]);
         };
@@ -521,11 +565,15 @@ int Create_display7seg_txt() {
 //creates diskout.txt
 int Create_diskout_txt() {
     int i, j;
+    int index = find_limit_index_in_diskout();
     FILE* file_a = open_w_then_a(diskout_path, "diskout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < 128; i++) { for (j = 0; j < 128; j++) { fprintf(file_a, "%08x\n", disk_matrix[i][j]); } }
-
+    for (i = 0; i < ((index-(index%128))/128); i++) { for (j = 0; j < 128; j++) { fprintf(file_a, "%08x\n", disk_matrix[i][j]); } }
+    for (j=0; j < index%128; j++){
+        fprintf(file_a, "%08x\n", disk_matrix[i][j]); 
+    };
+    printf("decide here if we should print in uppercase\n");
     fclose(file_a);
     return 1;
 }
@@ -533,10 +581,14 @@ int Create_diskout_txt() {
 //creates monitor.txt, based on monitor[][].
 int Create_monitor_txt() {
     int i, j;
+    int index = find_limit_index_in_monitor();
     FILE* file_a = open_w_then_a(monitor_txt_path, "monitor.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < 256; i++) { for (j = 0; j < 256; j++) { fprintf(file_a, "%02x\n", monitor[i][j]); } }
+    for (i = 0; i < ((index-(index%256))/256); i++) { for (j = 0; j < 256; j++) { fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); } }
+    for (j=0; j < (index%256); j++){
+        fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); 
+    };
 
     fclose(file_a);
     return 1;

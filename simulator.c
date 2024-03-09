@@ -793,13 +793,13 @@ void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
 //gets register's indexes, performs the lw command as it describes.
 void do_lw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    uint32_t mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
+    int mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
     *reg_pointer_array[rd_i] = dmem_array[mem_index] + *reg_pointer_array[rm_i];
 };
 
 //gets register's indexes, performs the sw command as it describes.
 void do_sw_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
-    uint32_t mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
+    int mem_index = (*reg_pointer_array[rs_i] + *reg_pointer_array[rt_i]) % 4096;
     uint32_t val = *reg_pointer_array[rm_i] + *reg_pointer_array[rd_i];
     dmem_array[mem_index] = val;
 };
@@ -1047,6 +1047,7 @@ int main(int argc, char* argv[]) {
         handle_ints();
         update_immediates();
         add_trace_node();
+        //if (cycle_counter >= 58) {break;}
     } while (exec_instruction());
 
     // Tear Down

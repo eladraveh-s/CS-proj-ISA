@@ -426,9 +426,6 @@ int Create_regout_txt() {
     if (file_a == NULL) { return -1; }
 
     for (i = 3; i < 16; i++) { fprintf(file_a, "%08x\n", *(reg_pointer_array[i])); }
-    for (i = 3; i < 16; i++) {
-        fprintf(file_a, "%08x\n", *(reg_pointer_array[i]));
-    };
 
     fclose(file_a);
     return 1;
@@ -932,7 +929,16 @@ void add_trace_node() {
 
 // Handles raising of interrupt status in case any of the interupt cases accured
 void handle_ints() {
-    int cnd0, cnd1, cnd2;
+    int cnd0 = irq0enable && irq0status, cnd1 = irq1enable && irq1status, cnd2 = irq2enable && irq2status;
+
+    // Raise flags
+    if (CURR_SIG == -1 && (cnd0 || cnd1 || cnd2)) {
+        if (cnd0) { CURR_SIG = 0; }
+        else if (cnd1) { CURR_SIG = 1; }
+        else if (cnd2) { CURR_SIG = 2; }
+        irqreturn = PC;
+        PC = irqhandler;
+    }
 
     // Timer
     if (timerenable) {
@@ -956,19 +962,6 @@ void handle_ints() {
         curr_irq2_node = curr_irq2_node->next;
     }
     else { irq2status = 0; }
-
-    cnd0 = irq0enable && irq0status;
-    cnd1 = irq1enable && irq1status;
-    cnd2 = irq2enable && irq2status;
-
-    // Raise flags
-    if (CURR_SIG == -1 && (cnd0 || cnd1 || cnd2)) {
-        if (cnd0) { CURR_SIG = 0; }
-        else if (cnd1) { CURR_SIG = 1; }
-        else if (cnd2) { CURR_SIG = 2; }
-        irqreturn = PC;
-        PC = irqhandler;
-    }
 }
 
 // Reads and executes am instruction

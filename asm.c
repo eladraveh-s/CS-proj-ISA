@@ -263,8 +263,8 @@ int main(int argc, char *argv[]) {
     }
 
     FILE *input_file = fopen(argv[1], "r");
-    FILE *data_mem = fopen(argv[2], "w");
-    FILE *inst_mem = fopen(argv[3], "w");
+    FILE *inst_mem = fopen(argv[2], "w");
+    FILE *data_mem = fopen(argv[3], "w");
 
 
     if (!input_file || !data_mem || !inst_mem) {

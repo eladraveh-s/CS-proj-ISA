@@ -585,8 +585,8 @@ int Create_monitor_txt() {
     FILE* file_a = open_w_then_a(monitor_txt_path, "monitor.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < ((index-(index%256))/256); i++) { for (j = 0; j < 256; j++) { fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); } }
-    for (j=0; j < (index%256); j++){
+    for (i = 0; i < ((index - (index % 256))/256); i++) { for (j = 0; j < 256; j++) { fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); } }
+    for (j=0; j < (index % 256); j++){
         fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); 
     };
 
@@ -1020,7 +1020,6 @@ void handle_ints() {
 // Reads and executes am instruction
 int exec_instruction() {
     int halt;
-    //uint8_t opcode = curr_trace_line_node->trace_line.inst.opcode;
     uint8_t opcode = imemin_instructions_array[PC].opcode;
 
     if ((halt = commit_the_instruction(imemin_instructions_array[PC])) == -1) { exit(-1); }
@@ -1032,6 +1031,7 @@ int exec_instruction() {
     return halt;
 }
 
+// Updates immediate 1 & 2's values before executing a command
 void update_immediates(){
     R_imm1 = (int32_t) imemin_instructions_array[PC].immediate1;
     R_imm2 = (int32_t) imemin_instructions_array[PC].immediate2;
@@ -1047,7 +1047,6 @@ int main(int argc, char* argv[]) {
         handle_ints();
         update_immediates();
         add_trace_node();
-        //if (cycle_counter >= 58) {break;}
     } while (exec_instruction());
 
     // Tear Down

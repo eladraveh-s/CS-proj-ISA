@@ -783,10 +783,11 @@ void do_bge_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 
 //gets register's indexes, performs the jal command as it describes.
 void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
-    if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
+    if (rd_i != 0 && rd_i != 1 && rd_i != 2) { 
+        *reg_pointer_array[rd_i] = PC + 1;
+    }; //read-only registers.
     uint16_t mask = 0xFFF; //0000111111111111
-    *reg_pointer_array[rd_i] = PC + 1;
-    PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
+    PC = (int16_t)((*reg_pointer_array[rm_i] & mask) -1); //the casting takes the 16 lower bits.
 };
 
 //gets register's indexes, performs the lw command as it describes.

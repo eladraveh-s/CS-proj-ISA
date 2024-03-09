@@ -1,0 +1,3 @@
+﻿  asm.c
+C:\Users\gr012\OneDrive\Desktop\asm\asm.c(181,1): warning C4715: 'get_label_address': not all control paths return a value
+  asm.vcxproj -> C:\Users\gr012\OneDrive\Desktop\asm\x64\Debug\asm.exe

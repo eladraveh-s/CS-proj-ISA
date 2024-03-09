@@ -797,24 +797,9 @@ int do_out_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     return 1;
 };
 
-int cnt = 0;
 //gets the instruction struct. calls the right function to commit it, with the right parameters.
 //returns -1 in error, 1 in success and 0 if the command is halt.
 int commit_the_instruction(Instruction inst) {
-    if (cnt == 5) {
-        printf("opcode: %u\n", inst.opcode);
-        printf("imm1: %d\n", R_imm1);
-        printf("imm1: %d\n", *reg_pointer_array[1]);
-        printf("imm2: %d\n", R_imm2);
-        printf("imm2: %d\n", *reg_pointer_array[2]);
-        
-        printf("rd: %u\n", inst.rd);
-        printf("rs: %u\n", inst.rs);
-        printf("rt: %u\n", inst.rt);
-        printf("rm: %u\n", inst.rm);
-    }; 
-    cnt += 1;
-
     switch (inst.opcode) {
     case 0:
         do_add_command(inst.rd, inst.rs, inst.rt, inst.rm);
@@ -950,12 +935,13 @@ void handle_ints() {
     int cnd0, cnd1, cnd2;
 
     // Timer
-    if (timerenable == 0) { return; }
-    if (timercurrent == timermax) {
-        irq0status = 1;
-        timercurrent = 0;
+    if (timerenable) {
+        if (timercurrent == timermax) {
+            irq0status = 1;
+            timercurrent = 0;
+        }
+        else { timercurrent++; }
     }
-    else { timercurrent++; }
 
     // Disk
     if (DISK_TIMEOUT != 0 && cycle_counter == DISK_TIMEOUT) {
@@ -965,12 +951,9 @@ void handle_ints() {
     }
 
     // irq2
-    if (curr_irq2_node != NULL) {
-        fprintf(stdout, "raised status cnd2");
-        if (cycle_counter == curr_irq2_node->cycle) {
-            irq2status = 1;
-            curr_irq2_node = curr_irq2_node->next;
-        }
+    if (curr_irq2_node != NULL && cycle_counter == curr_irq2_node->cycle) {
+        irq2status = 1;
+        curr_irq2_node = curr_irq2_node->next;
     }
     else { irq2status = 0; }
 
@@ -980,7 +963,6 @@ void handle_ints() {
 
     // Raise flags
     if (CURR_SIG == -1 && (cnd0 || cnd1 || cnd2)) {
-        fprintf(stdout, "starting interupt: cnd0 = %d, cnd1 = %d, cnd2 = %d", cnd0, cnd1, cnd2);
         if (cnd0) { CURR_SIG = 0; }
         else if (cnd1) { CURR_SIG = 1; }
         else if (cnd2) { CURR_SIG = 2; }

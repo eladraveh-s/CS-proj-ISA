@@ -16,7 +16,7 @@ char* register_names[16] = {"$zero","$imm1","$imm2","$v0","$a0","$a1","$a2","$t0
 
 
 struct label_node{
-    char name[MAX_LABEL_LEN+1];
+    char *name;
     int addr;
     struct label_node* next;
 };
@@ -37,7 +37,7 @@ int find_first_word_start(char line[]){
 
 void add_label(char name[],int address){
     struct label_node *new_label = malloc(sizeof(struct label_node));
-    strcpy(new_label->name,name);
+    new_label->name = name;
     new_label->addr = address;
     new_label->next = label_head;
     label_head = new_label; 

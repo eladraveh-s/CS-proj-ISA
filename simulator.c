@@ -69,22 +69,22 @@ uint64_t DISK_TIMEOUT = 0;
 int CURR_SIG = -1;
 
 //------Registers------//
-int32_t  R_Zero;
-int32_t  R_imm1;
-int32_t  R_imm2;
-int32_t  R_v0;
-int32_t  R_a0;
-int32_t  R_a1;
-int32_t  R_a2;
-int32_t  R_t0;
-int32_t  R_t1;
-int32_t  R_t2;
-int32_t  R_s0;
-int32_t  R_s1;
-int32_t  R_s2;
-int32_t  R_gp;
-int32_t  R_sp;
-int32_t  R_ra;
+int32_t  R_Zero = 0;
+int32_t  R_imm1 = 0;
+int32_t  R_imm2 = 0;
+int32_t  R_v0 = 0;
+int32_t  R_a0 = 0;
+int32_t  R_a1 = 0;
+int32_t  R_a2 = 0;
+int32_t  R_t0 = 0;
+int32_t  R_t1 = 0;
+int32_t  R_t2 = 0;
+int32_t  R_s0 = 0;
+int32_t  R_s1 = 0;
+int32_t  R_s2 = 0;
+int32_t  R_gp = 0;
+int32_t  R_sp = 0;
+int32_t  R_ra = 0;
 
 int32_t* reg_pointer_array[] = {
     &R_Zero,
@@ -106,29 +106,29 @@ int32_t* reg_pointer_array[] = {
 };
 
 //------IORegisters------//
-int32_t irq0enable;
-int32_t irq1enable;
-int32_t irq2enable;
-int32_t irq0status;
-int32_t irq1status;
-int32_t irq2status;
-int32_t irqhandler;
-int32_t irqreturn;
-int32_t clks;
-int32_t leds;
-int32_t display7seg;
-int32_t timerenable;
-int32_t timercurrent;
-int32_t timermax;
-int32_t diskcmd;
-int32_t disksector;
-int32_t diskbuffer;
-int32_t diskstatus;
-int32_t reserved1;
-int32_t reserved2;
-int32_t monitoraddr;
-int32_t monitordata;
-int32_t monitorcmd;
+int32_t irq0enable = 0;
+int32_t irq1enable = 0;
+int32_t irq2enable = 0;
+int32_t irq0status = 0;
+int32_t irq1status = 0;
+int32_t irq2status = 0;
+int32_t irqhandler = 0;
+int32_t irqreturn = 0;
+int32_t clks = 0;
+int32_t leds = 0;
+int32_t display7seg = 0;
+int32_t timerenable = 0;
+int32_t timercurrent = 0;
+int32_t timermax = 0;
+int32_t diskcmd = 0;
+int32_t disksector = 0;
+int32_t diskbuffer = 0;
+int32_t diskstatus = 0;
+int32_t reserved1 = 0;
+int32_t reserved2 = 0;
+int32_t monitoraddr = 0;
+int32_t monitordata = 0;
+int32_t monitorcmd = 0;
 
 int32_t* IO_reg_pointer_array[] = {
     &irq0enable,
@@ -200,7 +200,7 @@ const char* IO_reg_names[] = {
     "monitorcmd"
 };
 
-uint64_t cycle_counter;
+uint64_t cycle_counter = 0;
 
 //file paths
 char* imemin_path;
@@ -463,7 +463,6 @@ int Create_dmemout_txt() {
     for (i = 0; i < index; i++) {
         fprintf(file_a, "%08" PRIX32 "\n", dmem_array[i]);
     };
-
     fclose(file_a);
     return 1;
 };
@@ -695,21 +694,21 @@ void do_mac_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 //gets register's indexes, performs the and command as it describes.
 void do_and_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] & *reg_pointer_array[rt_i] & *reg_pointer_array[rm_i];
+    uint32_t val = (uint32_t)*reg_pointer_array[rs_i] & (uint32_t)*reg_pointer_array[rt_i] & (uint32_t)*reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the or command as it describes.
 void do_or_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] | *reg_pointer_array[rt_i] | *reg_pointer_array[rm_i];
+    uint32_t val = (((uint32_t)*reg_pointer_array[rs_i] | (uint32_t)*reg_pointer_array[rt_i]) | (uint32_t)*reg_pointer_array[rm_i]);
     *reg_pointer_array[rd_i] = val;
 };
 
 //gets register's indexes, performs the xor command as it describes.
 void do_xor_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] ^ *reg_pointer_array[rt_i] ^ *reg_pointer_array[rm_i];
+    uint32_t val = (uint32_t)*reg_pointer_array[rs_i] ^ (uint32_t)*reg_pointer_array[rt_i] ^ (uint32_t)*reg_pointer_array[rm_i];
     *reg_pointer_array[rd_i] = val;
 };
 
@@ -723,17 +722,19 @@ void do_sll_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 //gets register's indexes, performs the sra command as it describes.
 void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] >> *reg_pointer_array[rt_i];
+    int32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
     int32_t mask = 0xFFFFFFFF; //All 1's
     mask = mask << (32 - (*reg_pointer_array[rt_i]));
-    val = val | mask;
+    if (*reg_pointer_array[rs_i] < 0){
+        val = val | mask;
+    };
     *reg_pointer_array[rd_i] = val;
 }
 
 //gets register's indexes, performs the srl command as it describes.
 void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     if (rd_i == 0 || rd_i == 1 || rd_i == 2) { return; }; //read-only registers.
-    int32_t val = *reg_pointer_array[rs_i] >> *reg_pointer_array[rt_i];
+    uint32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
     *reg_pointer_array[rd_i] = val;
 };
 

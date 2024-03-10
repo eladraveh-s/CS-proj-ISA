@@ -43,16 +43,17 @@ void add_label(char name[], int address) {
     label_head = new_label;
 }
 
-int get_numerical_value(char str[]) {
+uint64_t get_numerical_value(char str[]) {
     if (strlen(str) > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
-        return (int)strtol(str, NULL, 16);
+        return (uint64_t)strtoull(str, NULL, 16);
+
     }
     return atoi(str);
 }
 
 void set_data_mem_arr(FILE* data_mem, char address[], char data[]) {
     int numeric_address = get_numerical_value(address);
-    int numeric_data = get_numerical_value(data);
+    uint64_t numeric_data = get_numerical_value(data);
     data_memory_arr[numeric_address] = numeric_data;
 }
 

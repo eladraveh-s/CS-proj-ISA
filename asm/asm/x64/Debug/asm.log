@@ -1,3 +1,5 @@
 ﻿  asm.c
-C:\Users\gr012\OneDrive\Desktop\asm\asm.c(181,1): warning C4715: 'get_label_address': not all control paths return a value
+C:\Users\gr012\OneDrive\Desktop\asm\asm.c(57,40): warning C4244: '=': conversion from 'uint64_t' to 'int', possible loss of data
+C:\Users\gr012\OneDrive\Desktop\asm\asm.c(55,27): warning C4244: 'initializing': conversion from 'uint64_t' to 'int', possible loss of data
+C:\Users\gr012\OneDrive\Desktop\asm\asm.c(182,1): warning C4715: 'get_label_address': not all control paths return a value
   asm.vcxproj -> C:\Users\gr012\OneDrive\Desktop\asm\x64\Debug\asm.exe

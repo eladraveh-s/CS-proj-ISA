@@ -280,16 +280,19 @@ int Init_dmem_array() {
     unsigned int i = 0;
     uint32_t line;
     FILE* file_r = fopen(dmemin_path, "r");
-    char buffer[13]; //cause every line is 12 chars
+    char buffer[9]; //cause every line is 8 chars
     if (file_r == NULL) { fprintf(stderr, "could not open path %s in r mode\n", dmemin_path); return 0; };
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        line = (uint32_t)strtoul(buffer, NULL, 16);
-        dmem_array[i] = line;
-        i += 1;
+        if (buffer[0] != '\n'){
+            line = (uint32_t)strtoul(buffer, NULL, 16);
+            dmem_array[i] = line;
+            i += 1;
+        };
     };
     fclose(file_r);
     return 1;
 };
+
 
 //reads from diskin.txt.
 int Load_diskin() {
@@ -302,17 +305,19 @@ int Load_diskin() {
         return 0;
     }
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        line = (uint32_t)strtoul(buffer, NULL, 16);
-        disk_matrix[i][j] = line;
-        j++;
-        if (j == 128) {
-            i++;
-            j = 0;
-        }
+        if (buffer[0] != '\n'){
+            line = (uint32_t)strtoul(buffer, NULL, 16);
+            disk_matrix[i][j] = line;
+            j++;
+            if (j == 128) {
+                i++;
+                j = 0;
+            }
+        };
     };
     fclose(file_r);
     return 1;
-}
+};
 
 // Creates a new irq2 node and appends it to the irq2 list
 void add_irq2_node(uint64_t number) {
@@ -569,11 +574,10 @@ int Create_diskout_txt() {
     FILE* file_a = open_w_then_a(diskout_path, "diskout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < ((index-(index%128))/128); i++) { for (j = 0; j < 128; j++) { fprintf(file_a, "%08x\n", disk_matrix[i][j]); } }
+    for (i = 0; i < ((index-(index%128))/128); i++) { for (j = 0; j < 128; j++) { fprintf(file_a, "%08"PRIX8"\n", disk_matrix[i][j]); } }
     for (j=0; j < index%128; j++){
-        fprintf(file_a, "%08x\n", disk_matrix[i][j]); 
+        fprintf(file_a, "%08"PRIX8"\n", disk_matrix[i][j]); 
     };
-    printf("decide here if we should print in uppercase\n");
     fclose(file_a);
     return 1;
 }

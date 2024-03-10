@@ -32,3 +32,6 @@ GenBin:
     lw $ra, $imm1, $sp, $zero, 2, 0
     add $sp, $sp, $imm1, $zero, 3, 0
     jal $t0, $zero, $zero, $ra, 0, 0        # Exits current Binom call
+
+.word 0x100 6
+.word 0x101 4

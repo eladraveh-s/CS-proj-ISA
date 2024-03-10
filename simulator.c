@@ -162,6 +162,14 @@ Instruction imemin_instructions_array[4096];
 uint32_t dmem_array[4096];
 uint32_t disk_matrix[128][128];
 
+void reset_consts() {
+    int i, j;
+
+    for (i = 0; i < 256; i++) { for (j = 0; j < 256; j++) { monitor[i][j] = 0; } }
+    for (i = 0; i < 128; i++) { for (j = 0; j < 128; j++) { disk_matrix[i][j] = 0; } }
+    for (i = 0; i < 4096; i++) { dmem_array[i] = 0; }
+}
+
 //-------Tracing Lists----------//
 Trace_line_node* head_trace_line_list = NULL;
 Trace_line_node* curr_trace_line_node = NULL;
@@ -258,14 +266,14 @@ int Init_instructions_array() {
         strncpy(ThreeCharString, buffer + 6, 3); //immediate 1
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
-        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f'){
+        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f') {
             result = result | neg_mask; //trouble with casting, cause 12 bit var gets into 16 bits var, deafult 0 extantion.
         };
         imemin_instructions_array[i].immediate1 = (int16_t)result;
         strncpy(ThreeCharString, buffer + 9, 3); //immediate 2
         ThreeCharString[3] = '\0';
         result = strtoul(ThreeCharString, NULL, 16);
-        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f'){
+        if ((ThreeCharString[0] == 'F') || ThreeCharString[0] == 'f') {
             result = result | neg_mask; //trouble with casting, cause 12 bit var gets into 16 bits var, deafult 0 extantion.
         };
         imemin_instructions_array[i].immediate2 = (int16_t)result;
@@ -283,7 +291,7 @@ int Init_dmem_array() {
     char buffer[9]; //cause every line is 8 chars
     if (file_r == NULL) { fprintf(stderr, "could not open path %s in r mode\n", dmemin_path); return 0; };
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        if (buffer[0] != '\n'){
+        if (buffer[0] != '\n') {
             line = (uint32_t)strtoul(buffer, NULL, 16);
             dmem_array[i] = line;
             i += 1;
@@ -305,7 +313,7 @@ int Load_diskin() {
         return 0;
     }
     while (fgets(buffer, sizeof(buffer), file_r) != NULL) {
-        if (buffer[0] != '\n'){
+        if (buffer[0] != '\n') {
             line = (uint32_t)strtoul(buffer, NULL, 16);
             disk_matrix[i][j] = line;
             j++;
@@ -334,7 +342,7 @@ void add_irq2_node(uint64_t number) {
 //reads from irg2in.txt, and inits the "irq2in_list". 
 int Load_irq2in() {
     int index = 0;
-    char chr, cur_num[200] = {'\0'};
+    char chr, cur_num[200] = { '\0' };
     FILE* file_r = fopen(irq2in_path, "r");
 
     if (file_r == NULL) {
@@ -360,13 +368,13 @@ int Load_irq2in() {
 //-----------Output functions----------//
 
 // Helper Functions
-FILE* open_in_mode(char* file_path, const char * file_name, const char * mode) {
+FILE* open_in_mode(char* file_path, const char* file_name, const char* mode) {
     FILE* fd = fopen(file_path, mode);
     if (fd == NULL) { fprintf(stderr, "could not open file %s's path %s in %s mode\n", file_name, file_path, mode); };
     return fd;
 }
 
-FILE* open_w_then_a(char * file_path, const char * file_name) {
+FILE* open_w_then_a(char* file_path, const char* file_name) {
     FILE* file_w, * file_a;
     if ((file_w = open_in_mode(file_path, file_name, "w")) == NULL) { return NULL; }
     fclose(file_w);
@@ -412,26 +420,26 @@ uint64_t convert_instruction_to_bits(Instruction inst) {
 };
 
 //finds the index that its only zeros after
-int find_limit_index_in_dmem(){
+int find_limit_index_in_dmem() {
     int i;
     int index = 0;
     for (i = 0; i < 4096; i++) {
         if (dmem_array[i] != 0) {
-            index = i+1;
+            index = i + 1;
         };
     };
     return index;
 };
 
 //finds the index that its only zeros after
-int find_limit_index_in_diskout(){
+int find_limit_index_in_diskout() {
     int i;
     int j;
     int index = 0;
-    for (i = 0; i < 128; i++) { 
-        for (j = 0; j < 128; j++) { 
-            if (disk_matrix[i][j] != 0){
-                index = i*128 + j + 1;
+    for (i = 0; i < 128; i++) {
+        for (j = 0; j < 128; j++) {
+            if (disk_matrix[i][j] != 0) {
+                index = i * 128 + j + 1;
             };
         };
     };
@@ -439,14 +447,14 @@ int find_limit_index_in_diskout(){
 };
 
 //finds the index that its only zeros after
-int find_limit_index_in_monitor(){
+int find_limit_index_in_monitor() {
     int i;
     int j;
     int index = 0;
-    for (i = 0; i < 256; i++) { 
-        for (j = 0; j < 256; j++) { 
-            if (monitor[i][j] != 0){
-                index = i*256 + j + 1;
+    for (i = 0; i < 256; i++) {
+        for (j = 0; j < 256; j++) {
+            if (monitor[i][j] != 0) {
+                index = i * 256 + j + 1;
             };
         };
     };
@@ -461,7 +469,7 @@ int Create_dmemout_txt() {
     if (file_a == NULL) { return -1; }
 
     for (i = 0; i < index; i++) {
-        fprintf(file_a, "%08" PRIX32 "\n", dmem_array[i]);
+        fprintf(file_a, "%08X\n", dmem_array[i]);
     };
     fclose(file_a);
     return 1;
@@ -473,7 +481,7 @@ int Create_regout_txt() {
     FILE* file_a = open_w_then_a(regout_path, "regout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 3; i < 16; i++) { fprintf(file_a, "%08"PRIX32"\n", *(reg_pointer_array[i])); }
+    for (i = 3; i < 16; i++) { fprintf(file_a, "%08x\n", *(reg_pointer_array[i])); }
 
     fclose(file_a);
     return 1;
@@ -482,14 +490,14 @@ int Create_regout_txt() {
 //creates trace.txt, based on trace_line_list
 int Create_trace_txt() {
     int i;
-    Trace_line_node *tmp;
+    Trace_line_node* tmp;
     FILE* file_a = open_w_then_a(trace_path, "trace.txt");
     if (file_a == NULL) { return -1; }
     curr_trace_line_node = head_trace_line_list;
 
     while (curr_trace_line_node != NULL) {
-        fprintf(file_a, "%03"PRIX16" ", curr_trace_line_node->trace_line.pc);
-        fprintf(file_a, "%012"PRIX64, convert_instruction_to_bits(curr_trace_line_node->trace_line.inst));
+        fprintf(file_a, "%03X ", curr_trace_line_node->trace_line.pc);
+        fprintf(file_a, "%012X", convert_instruction_to_bits(curr_trace_line_node->trace_line.inst));
         for (i = 0; i < 16; i++) {
             fprintf(file_a, " %08x", curr_trace_line_node->trace_line.reg_pointer_array_snap[i]);
         };
@@ -573,9 +581,13 @@ int Create_diskout_txt() {
     FILE* file_a = open_w_then_a(diskout_path, "diskout.txt");
     if (file_a == NULL) { return -1; }
 
-    for (i = 0; i < ((index-(index%128))/128); i++) { for (j = 0; j < 128; j++) { fprintf(file_a, "%08"PRIX8"\n", disk_matrix[i][j]); } }
-    for (j=0; j < index%128; j++){
-        fprintf(file_a, "%08"PRIX8"\n", disk_matrix[i][j]); 
+    for (i = 0; i < ((index - (index % 128)) / 128); i++) {
+        for (j = 0; j < 128; j++) {
+            fprintf(file_a, "%08X\n", disk_matrix[i][j]);
+        }
+    }
+    for (j = 0; j < index % 128; j++) {
+        fprintf(file_a, "%08X\n", disk_matrix[i][j]);
     };
     fclose(file_a);
     return 1;
@@ -585,12 +597,24 @@ int Create_diskout_txt() {
 int Create_monitor_txt() {
     int i, j;
     int index = find_limit_index_in_monitor();
-    FILE* file_a = open_w_then_a(monitor_txt_path, "monitor.txt");
-    if (file_a == NULL) { return -1; }
+    FILE* file_a, * file_b;
 
-    for (i = 0; i < ((index - (index % 256))/256); i++) { for (j = 0; j < 256; j++) { fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); } }
-    for (j=0; j < (index % 256); j++){
-        fprintf(file_a, "%02"PRIX8"\n", monitor[i][j]); 
+    file_a = open_w_then_a(monitor_txt_path, "monitor.txt");
+    if (file_a == NULL) { return -1; }
+    file_b = fopen(monitor_yuv_path, "wb");
+    if (file_b == NULL) {
+        fclose(file_a);
+        return -1;
+    }
+
+    for (i = 0; i < ((index - (index % 256)) / 256); i++) {
+        for (j = 0; j < 256; j++) {
+            fprintf(file_a, "%02X\n", monitor[i][j]);
+            fwrite(&(monitor[i][j]), 1, 1, file_b);
+        }
+    }
+    for (j = 0; j < (index % 256); j++) {
+        fprintf(file_a, "%02X\n", monitor[i][j]);
     };
 
     fclose(file_a);
@@ -625,14 +649,14 @@ void add_hw_trace_node(int reg_num, int read) {
 
     curr_hw_trace_line_node->next = NULL;
     curr_hw_trace_line_node->hw_trace_line.cycle = cycle_counter;
-    curr_hw_trace_line_node->hw_trace_line.read = (uint8_t) read;
-    curr_hw_trace_line_node->hw_trace_line.reg_num = (uint8_t) reg_num;
+    curr_hw_trace_line_node->hw_trace_line.read = (uint8_t)read;
+    curr_hw_trace_line_node->hw_trace_line.reg_num = (uint8_t)reg_num;
     curr_hw_trace_line_node->hw_trace_line.data = *IO_reg_pointer_array[reg_num];
 }
 
 // Creates a new leds trace node and appends it to the leds trace list
 void add_leds_trace_node() {
-    Display_trace_line_node* new_node = (Display_trace_line_node*) malloc(sizeof(Display_trace_line_node));
+    Display_trace_line_node* new_node = (Display_trace_line_node*)malloc(sizeof(Display_trace_line_node));
     if (new_node == NULL) { exit(1); }
 
     if (curr_leds_trace_node != NULL) { curr_leds_trace_node->next = new_node; }
@@ -725,7 +749,7 @@ void do_sra_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
     int32_t val = (uint32_t)*reg_pointer_array[rs_i] >> (uint32_t)*reg_pointer_array[rt_i];
     int32_t mask = 0xFFFFFFFF; //All 1's
     mask = mask << (32 - (*reg_pointer_array[rt_i]));
-    if (*reg_pointer_array[rs_i] < 0){
+    if (*reg_pointer_array[rs_i] < 0) {
         val = val | mask;
     };
     *reg_pointer_array[rd_i] = val;
@@ -742,7 +766,7 @@ void do_srl_command(uint8_t rd_i, uint8_t rs_i, uint8_t rt_i) {
 void do_beq_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
     uint16_t mask = 0xFFF; //00000111111111111
     if (*reg_pointer_array[rs_i] == *reg_pointer_array[rt_i]) {
-        PC = (uint16_t) ((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
+        PC = (uint16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
     };
 };
 
@@ -788,11 +812,11 @@ void do_bge_command(uint8_t rs_i, uint8_t rt_i, uint8_t rm_i) {
 
 //gets register's indexes, performs the jal command as it describes.
 void do_jal_command(uint8_t rd_i, uint8_t rm_i) {
-    if (rd_i != 0 && rd_i != 1 && rd_i != 2) { 
+    if (rd_i != 0 && rd_i != 1 && rd_i != 2) {
         *reg_pointer_array[rd_i] = PC + 1;
     }; //read-only registers.
     uint16_t mask = 0xFFF; //0000111111111111
-    PC = (int16_t)((*reg_pointer_array[rm_i] & mask) -1); //the casting takes the 16 lower bits.
+    PC = (int16_t)((*reg_pointer_array[rm_i] & mask) - 1); //the casting takes the 16 lower bits.
 };
 
 //gets register's indexes, performs the lw command as it describes.
@@ -972,16 +996,16 @@ void copy_regs_array(int32_t* array) {
 
 // Creates a new trace node and appends it to the trace lists
 void add_trace_node() {
-    Trace_line_node *new_node = (Trace_line_node *) malloc(sizeof(Trace_line_node));
+    Trace_line_node* new_node = (Trace_line_node*)malloc(sizeof(Trace_line_node));
     if (new_node == NULL) { exit(1); }
-    
+
     if (curr_trace_line_node != NULL) { curr_trace_line_node->next = new_node; }
     else { head_trace_line_list = new_node; }
     curr_trace_line_node = new_node;
 
     curr_trace_line_node->next = NULL;
     copy_regs_array(curr_trace_line_node->trace_line.reg_pointer_array_snap);
-    curr_trace_line_node->trace_line.pc = PC; 
+    curr_trace_line_node->trace_line.pc = PC;
     curr_trace_line_node->trace_line.inst = imemin_instructions_array[PC];
 }
 
@@ -1037,16 +1061,16 @@ int exec_instruction() {
 }
 
 // Updates immediate 1 & 2's values before executing a command
-void update_immediates(){
-    R_imm1 = (int32_t) imemin_instructions_array[PC].immediate1;
-    R_imm2 = (int32_t) imemin_instructions_array[PC].immediate2;
+void update_immediates() {
+    R_imm1 = (int32_t)imemin_instructions_array[PC].immediate1;
+    R_imm2 = (int32_t)imemin_instructions_array[PC].immediate2;
 };
 
 int main(int argc, char* argv[]) {
     // Set Up
     set_up_files(argv + 1);
     load_files();
-    
+
     // Main
     do {
         handle_ints();

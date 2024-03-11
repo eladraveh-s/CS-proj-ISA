@@ -337,6 +337,7 @@ void add_irq2_node(uint64_t number) {
     curr_irq2_node = new_node;
 
     curr_irq2_node->cycle = number;
+    curr_irq2_node->next = NULL;
 }
 
 //reads from irg2in.txt, and inits the "irq2in_list". 

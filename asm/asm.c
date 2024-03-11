@@ -141,17 +141,17 @@ int get_opcode(char str[]) {
         }
     }
     return -1;
-    printf("Error, couldnt find opcode"); //REMOVE BEFORE SUBMISSION 
+    printf("Error, couldnt find opcode"); 
 }
 
-uint64_t get_reg(char str[]) {
+int get_reg(char str[]) {
     for (int i = 0; i < 16; i++) {
         if (strcmp(register_names[i], str) == 0) {
             return i;
         }
     }
     return -1;
-    printf("Error, couldnt find register"); //REMOVE BEFORE SUBMISSION
+    printf("Error, couldnt find register"); 
 }
 
 int get_next_word(char line[], int i, char word[]) {

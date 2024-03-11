@@ -51,7 +51,7 @@ uint64_t get_numerical_value(char str[]) {
     return atoi(str);
 }
 
-void set_data_mem_arr(FILE* data_mem, char address[], char data[]) {
+void set_data_mem_arr(char address[], char data[]) {
     int numeric_address = get_numerical_value(address);
     uint64_t numeric_data = get_numerical_value(data);
     data_memory_arr[numeric_address] = numeric_data;
@@ -123,7 +123,7 @@ void first_pass(FILE* input_file, FILE* data_mem) {
             }
             data_mem_data[j] = '\0';
 
-            set_data_mem_arr(data_mem, data_mem_address, data_mem_data);
+            set_data_mem_arr(data_mem_address, data_mem_data);
         }
 
         else {
